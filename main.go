@@ -2,12 +2,17 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"log"
+)
+
+import (
+	"github.com/video_backup_checker/calc"
+	"github.com/video_backup_checker/merge"
 )
 
 func main() {
 	service := determineService()
-	fmt.Println(service)
+	runService(service)
 }
 
 // コマンドライン引数から実行するサービスを決定する。
@@ -20,4 +25,16 @@ func determineService() (service string) {
 	}
 
 	return
+}
+
+// 指定されたサービスを実行する。
+func runService(service string) {
+	switch service {
+	case "calc":
+		calc.Execute()
+	case "merge":
+		merge.Execute()
+	default:
+		log.Fatalf("不正なサービス指定: %v", service)
+	}
 }

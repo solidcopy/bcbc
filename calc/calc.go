@@ -2,10 +2,12 @@ package calc
 
 import (
 	"bufio"
+	"io/fs"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -25,9 +27,11 @@ func Execute() {
 		go func(di *DiskInfo) {
 			defer func() { queue <- true }()
 
-			hashedFileList := hashedFileList(di.hashFile())
-			for _, hashedFile := range hashedFileList {
-				log.Println(hashedFile)
+			//hashedFileList := hashedFileList(di.hashFile())
+
+			targetFileList := targetFileList(di.path)
+			for _, targetFile := range targetFileList {
+				log.Println(targetFile)
 			}
 		}(&di)
 	}
@@ -92,10 +96,11 @@ func diskRoots(diskFiles []string) []DiskInfo {
 			continue
 		}
 
+		diskPath := path.Dir(diskFile)
 		id := match[0]
 		group := id[0:1]
 
-		diskInfoList = append(diskInfoList, DiskInfo{diskFile, group, id})
+		diskInfoList = append(diskInfoList, DiskInfo{diskPath, group, id})
 	}
 
 	return diskInfoList
@@ -134,6 +139,24 @@ func hashedFileList(hashFile string) []string {
 
 		filePath := tokens[0]
 		result = append(result, filePath)
+	}
+
+	return result
+}
+
+// ハッシュ対象ファイル一覧を作成する。
+func targetFileList(root string) []string {
+
+	result := make([]string, 0, 1024)
+
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if !d.IsDir() {
+			result = append(result, path)
+		}
+		return nil
+	})
+	if err != nil {
+		log.Fatalln(err)
 	}
 
 	return result

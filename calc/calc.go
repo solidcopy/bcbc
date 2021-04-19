@@ -1,11 +1,13 @@
 package calc
 
 import (
+	"bufio"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
 	"regexp"
+	"strings"
 )
 
 func Execute() {
@@ -16,9 +18,22 @@ func Execute() {
 		log.Printf("diskファイルが見つかりませんでした。")
 	}
 
+	queue := make(chan bool)
+
 	diskInfoList := diskRoots(diskFiles)
 	for _, di := range diskInfoList {
-		log.Printf("%#v\n", di)
+		go func(di *DiskInfo) {
+			defer func() { queue <- true }()
+
+			hashedFileList := hashedFileList(di.hashFile())
+			for _, hashedFile := range hashedFileList {
+				log.Println(hashedFile)
+			}
+		}(&di)
+	}
+
+	for range diskInfoList {
+		<-queue
 	}
 
 	log.Println("ハッシュ計算を終了しました。")
@@ -84,4 +99,42 @@ func diskRoots(diskFiles []string) []DiskInfo {
 	}
 
 	return diskInfoList
+}
+
+// ハッシュファイルのパスを返す。
+func (di *DiskInfo) hashFile() string {
+	mergeDir, found := os.LookupEnv("VBCMERGE")
+	if !found {
+		log.Fatalln("環境変数VBCMERGEが設定されていません。")
+	}
+	return path.Join(mergeDir, di.id)
+}
+
+// ハッシュファイルからハッシュ計算済みのファイル一覧を作成する。
+func hashedFileList(hashFile string) []string {
+
+	hashFileIn, err := os.Open(hashFile)
+	if err != nil {
+		log.Println("ハッシュファイルの読み込みに失敗しました。:", hashFile)
+		return []string{}
+	}
+	defer hashFileIn.Close()
+
+	result := make([]string, 0, 1024)
+
+	hashFileScanner := bufio.NewScanner(hashFileIn)
+	for hashFileScanner.Scan() {
+		line := hashFileScanner.Text()
+
+		tokens := strings.Split(line, ":")
+		if len(tokens) != 2 {
+			log.Println("ハッシュファイルが破損しています。:", hashFile)
+			return []string{}
+		}
+
+		filePath := tokens[0]
+		result = append(result, filePath)
+	}
+
+	return result
 }

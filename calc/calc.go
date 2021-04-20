@@ -27,16 +27,10 @@ func Execute() {
 		go func(di *DiskInfo) {
 			defer func() { queue <- true }()
 
-			//hashedFileList := hashedFileList(di.hashFile())
-
 			targetFileList := targetFileList(di.path)
-
-			filteredTargetFileList := make([]string, 0, len(targetFileList))
-			for _, targetFile := range targetFileList {
-				if filterTargetFile(targetFile) {
-					filteredTargetFileList = append(filteredTargetFileList, targetFile)
-				}
-			}
+			hashedFileSet := hashedFileSet(di)
+			unhashedTargetFileList := removeHashedFiles(targetFileList, hashedFileSet)
+			filteredTargetFileList := filterTargetFiles(unhashedTargetFileList)
 
 			for _, tf := range filteredTargetFileList {
 				log.Println(tf)
@@ -123,35 +117,6 @@ func (di *DiskInfo) hashFile() string {
 	return path.Join(mergeDir, di.id)
 }
 
-// ハッシュファイルからハッシュ計算済みのファイル一覧を作成する。
-func hashedFileList(hashFile string) []string {
-
-	hashFileIn, err := os.Open(hashFile)
-	if err != nil {
-		log.Println("ハッシュファイルの読み込みに失敗しました。:", hashFile)
-		return []string{}
-	}
-	defer hashFileIn.Close()
-
-	result := make([]string, 0, 1024)
-
-	hashFileScanner := bufio.NewScanner(hashFileIn)
-	for hashFileScanner.Scan() {
-		line := hashFileScanner.Text()
-
-		tokens := strings.Split(line, ":")
-		if len(tokens) != 2 {
-			log.Println("ハッシュファイルが破損しています。:", hashFile)
-			return []string{}
-		}
-
-		filePath := tokens[0]
-		result = append(result, filePath)
-	}
-
-	return result
-}
-
 // ハッシュ対象ファイル一覧を作成する。
 func targetFileList(root string) []string {
 
@@ -168,6 +133,47 @@ func targetFileList(root string) []string {
 	}
 
 	return result
+}
+
+// ハッシュファイルからハッシュ計算済みのファイルセットを作成する。
+func hashedFileSet(di *DiskInfo) map[string]bool {
+
+	hashFile := di.hashFile()
+	hashFileIn, err := os.Open(hashFile)
+	if err != nil {
+		log.Println("ハッシュファイルの読み込みに失敗しました。:", hashFile)
+		return map[string]bool{}
+	}
+	defer hashFileIn.Close()
+
+	result := make(map[string]bool, 1024)
+
+	hashFileScanner := bufio.NewScanner(hashFileIn)
+	for hashFileScanner.Scan() {
+		line := hashFileScanner.Text()
+
+		tokens := strings.Split(line, ":")
+		if len(tokens) != 2 {
+			log.Println("ハッシュファイルが破損しています。:", hashFile)
+			return map[string]bool{}
+		}
+
+		filePath := path.Join(di.path, tokens[0])
+		result[filePath] = true
+	}
+
+	return result
+}
+
+// ハッシュ対象ファイルのリストからハッシュ済みのファイルを除外する。
+func removeHashedFiles(targetFileList []string, hashedFileSet map[string]bool) []string {
+	unhashedTargetFileList := make([]string, 0)
+	for _, targetFile := range targetFileList {
+		if !hashedFileSet[targetFile] {
+			unhashedTargetFileList = append(unhashedTargetFileList, targetFile)
+		}
+	}
+	return unhashedTargetFileList
 }
 
 // Filter フィルター
@@ -233,4 +239,15 @@ func filterTargetFile(path string) bool {
 	}
 
 	return false
+}
+
+// ハッシュ対象ファイルをフィルター設定で絞り込む。
+func filterTargetFiles(targetFileList []string) []string {
+	filteredTargetFileList := make([]string, 0)
+	for _, targetFile := range targetFileList {
+		if filterTargetFile(targetFile) {
+			filteredTargetFileList = append(filteredTargetFileList, targetFile)
+		}
+	}
+	return filteredTargetFileList
 }

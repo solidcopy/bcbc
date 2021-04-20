@@ -30,8 +30,16 @@ func Execute() {
 			//hashedFileList := hashedFileList(di.hashFile())
 
 			targetFileList := targetFileList(di.path)
+
+			filteredTargetFileList := make([]string, 0, len(targetFileList))
 			for _, targetFile := range targetFileList {
-				log.Println(targetFile)
+				if filterTargetFile(targetFile) {
+					filteredTargetFileList = append(filteredTargetFileList, targetFile)
+				}
+			}
+
+			for _, tf := range filteredTargetFileList {
+				log.Println(tf)
 			}
 		}(&di)
 	}
@@ -150,7 +158,7 @@ func targetFileList(root string) []string {
 	result := make([]string, 0, 1024)
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if !d.IsDir() {
+		if !d.IsDir() && filterTargetFile(path) {
 			result = append(result, path)
 		}
 		return nil
@@ -160,4 +168,69 @@ func targetFileList(root string) []string {
 	}
 
 	return result
+}
+
+// Filter フィルター
+type Filter struct {
+	pattern   *regexp.Regexp
+	inclusion bool
+}
+
+// フィルター一覧
+var filters []Filter
+
+// フィルター設定を読み込む。
+func init() {
+	vbcHome, found := os.LookupEnv("VBCHOME")
+	if !found {
+		log.Fatalln("環境変数VBCHOMEが設定されていません。")
+	}
+
+	filterFile := path.Join(vbcHome, "config", "filter.conf")
+	filterFileIn, err := os.Open(filterFile)
+	if err != nil {
+		log.Fatalln("フィルター設定ファイルが見つかりません。")
+	}
+	defer filterFileIn.Close()
+
+	filters = make([]Filter, 0, 10)
+
+	validFilterFile := true
+
+	filterFileScanner := bufio.NewScanner(filterFileIn)
+	for filterFileScanner.Scan() {
+		line := filterFileScanner.Text()
+
+		if len(line) < 2 || (line[0] != '+' && line[0] != '-') {
+			log.Println("1", line)
+			validFilterFile = false
+			break
+		}
+
+		pattern, err := regexp.Compile(line[1:])
+		if err != nil {
+			log.Println("2", line)
+			validFilterFile = false
+			break
+		}
+
+		inclusion := line[0] == '+'
+		filter := Filter{pattern, inclusion}
+		filters = append(filters, filter)
+	}
+
+	if !validFilterFile {
+		log.Fatalln("フィルター設定ファイルの形式が不正です。")
+	}
+}
+
+// 指定されたファイルがハッシュ対象であるかフィルター設定から判定する。
+func filterTargetFile(path string) bool {
+	for _, filter := range filters {
+		if filter.pattern.MatchString(path) {
+			return filter.inclusion
+		}
+	}
+
+	return false
 }

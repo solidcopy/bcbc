@@ -22,7 +22,8 @@ func Execute() {
 			targetFiles := listTargetFiles(di)
 
 			for _, tf := range targetFiles {
-				log.Println(tf)
+				hash, _ := calcHash(tf)
+				log.Printf("%s:%x", tf, hash)
 			}
 		}(&di)
 	}

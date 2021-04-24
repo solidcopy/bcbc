@@ -1,7 +1,6 @@
 package calc
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -37,19 +36,20 @@ func findDiskFiles() []string {
 
 // DiskInfo ディスク情報
 type DiskInfo struct {
+	index int
 	path  string
 	group string
 	id    string
 }
 
 // diskファイルの一覧からディスク情報のスライスを作成する。
-func diskRoots(diskFiles []string) []DiskInfo {
+func makeDiskInfoList(diskFiles []string) []DiskInfo {
 	var diskInfoList = make([]DiskInfo, 0, len(diskFiles))
 
 	pattern := regexp.MustCompile("\\A([A-Z]\\d+)")
 
-	for _, diskFile := range diskFiles {
-		diskFileData, err := ioutil.ReadFile(diskFile)
+	for i, diskFile := range diskFiles {
+		diskFileData, err := os.ReadFile(diskFile)
 		if err != nil {
 			log.Println("diskファイルが読み込めませんでした。:", err)
 			continue
@@ -57,7 +57,7 @@ func diskRoots(diskFiles []string) []DiskInfo {
 
 		match := pattern.FindStringSubmatch(string(diskFileData))
 		if match == nil {
-			log.Printf("diskファイルの内容が不正です。: %s", diskFile)
+			log.Println("diskファイルの内容が不正です。:", diskFile)
 			continue
 		}
 
@@ -65,7 +65,7 @@ func diskRoots(diskFiles []string) []DiskInfo {
 		id := match[0]
 		group := id[0:1]
 
-		diskInfoList = append(diskInfoList, DiskInfo{diskPath, group, id})
+		diskInfoList = append(diskInfoList, DiskInfo{i, diskPath, group, id})
 	}
 
 	return diskInfoList

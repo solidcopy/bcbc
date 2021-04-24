@@ -46,7 +46,6 @@ func hashedFileSet(di *DiskInfo) map[string]bool {
 	hashFile := di.hashFile()
 	hashFileIn, err := os.Open(hashFile)
 	if err != nil {
-		log.Println("ハッシュファイルの読み込みに失敗しました。:", hashFile)
 		return map[string]bool{}
 	}
 	defer hashFileIn.Close()
@@ -155,4 +154,42 @@ func filterFiles(fileList []string) []string {
 		}
 	}
 	return filteredFileList
+}
+
+// FileInfo ファイル情報
+type FileInfo struct {
+	path string
+	size int64
+}
+
+// Size ファイルサイズを返す。
+func (tf *FileInfo) Size() uint64 {
+	if tf.StatSuccess() {
+		return uint64(tf.size)
+	} else {
+		return 0
+	}
+}
+
+// StatSuccess ファイルサイズの取得が成功したかを返す。
+func (tf *FileInfo) StatSuccess() bool {
+	return tf.size >= 0
+}
+
+// ファイル情報リストを作成する。
+func toFileInfoList(targetFiles []string) []FileInfo {
+
+	fileInfoList := make([]FileInfo, 0, len(targetFiles))
+	for _, tf := range targetFiles {
+		stat, err := os.Stat(tf)
+		size := int64(-1)
+		if err == nil {
+			size = stat.Size()
+		} else {
+			log.Println(err)
+		}
+		fileInfoList = append(fileInfoList, FileInfo{tf, size})
+	}
+
+	return fileInfoList
 }

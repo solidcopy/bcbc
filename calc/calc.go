@@ -2,6 +2,7 @@ package calc
 
 import (
 	"log"
+	"time"
 )
 
 func Execute(diskRoots []string) {
@@ -15,7 +16,7 @@ func Execute(diskRoots []string) {
 	progressChannel := make(chan ProgressInfo)
 	quitChannel := make(chan bool)
 	diskInfoList := makeDiskInfoList(diskFiles)
-	go watchProgress(diskInfoList, progressChannel)
+	go watchProgress(len(diskInfoList), progressChannel)
 
 	for i := range diskInfoList {
 		go hashRoutine(diskInfoList, i, progressChannel, quitChannel)
@@ -41,7 +42,9 @@ func hashRoutine(diskInfoList []DiskInfo, i int, progressChannel chan ProgressIn
 	progressInfo := ProgressInfo{
 		diskInfo:  di,
 		fileCount: ProgressCount{uint64(totalFiles), 0},
-		sizeCount: ProgressCount{totalSize, 0}}
+		sizeCount: ProgressCount{totalSize, 0},
+		startTime: time.Now(),
+	}
 	progressChannel <- progressInfo
 
 	failFiles := make([]string, 0)

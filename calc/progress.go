@@ -42,6 +42,9 @@ type ProgressCount struct {
 }
 
 func (pc *ProgressCount) ProgressRate() float64 {
+	if pc.total == 0 {
+		return 1.0
+	}
 	return float64(pc.processed) / float64(pc.total)
 }
 

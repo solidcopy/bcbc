@@ -1,7 +1,10 @@
 package calc
 
 import (
+	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -34,6 +37,14 @@ func Execute(diskRoots []string) {
 func hashRoutine(diskInfoList []DiskInfo, i int, progressChannel chan ProgressInfo, quitChannel chan bool) {
 	di := &diskInfoList[i]
 
+	hashFileIn, err := os.OpenFile(di.hashFile(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println(err)
+		quitChannel <- false
+		return
+	}
+	defer hashFileIn.Close()
+
 	targetFiles := listTargetFiles(di)
 	fileInfoList := toFileInfoList(targetFiles)
 
@@ -55,13 +66,22 @@ func hashRoutine(diskInfoList []DiskInfo, i int, progressChannel chan ProgressIn
 			continue
 		}
 
-		_, err := calcHash(fi.path, progressInfo, progressChannel)
+		hash, err := calcHash(fi.path, progressInfo, progressChannel)
+
 		progressInfo.fileCount.Increment(uint64(1))
 		progressInfo.sizeCount.Increment(fi.Size())
 
 		if err != nil {
 			failFiles = append(failFiles, fi.path)
 			continue
+		}
+
+		relativePath, _ := filepath.Rel(di.path, fi.path)
+		_, err = fmt.Fprintf(hashFileIn, "%s:%x\n", relativePath, hash)
+		if err != nil {
+			log.Println(err)
+			quitChannel <- false
+			return
 		}
 	}
 

@@ -51,7 +51,7 @@ func (pc *ProgressCount) Increment(n uint64) {
 }
 
 // 進捗監視ルーチン。
-func watchProgress(diskInfoList []DiskInfo, progressChannel chan ProgressInfo, quitChannel chan bool) {
+func watchProgress(diskInfoList []DiskInfo, progressChannel chan ProgressInfo) {
 	progressInfoList := make([]ProgressInfo, len(diskInfoList))
 
 	lastPrintTime := time.Now()
@@ -60,34 +60,24 @@ func watchProgress(diskInfoList []DiskInfo, progressChannel chan ProgressInfo, q
 		progressInfo := <-progressChannel
 		progressInfoList[progressInfo.diskInfo.index] = progressInfo
 
-		allCompleted := true
-		for _, pi := range progressInfoList {
-			if !pi.fileCount.Completed() {
-				allCompleted = false
-				break
-			}
-		}
-		if allCompleted {
+		if time.Now().Sub(lastPrintTime) >= time.Second {
 			printProgress(progressInfoList)
-			break
-		}
-
-		now := time.Now()
-		if now.Sub(lastPrintTime) >= time.Second {
-			printProgress(progressInfoList)
-			lastPrintTime = now
+			lastPrintTime = time.Now()
 		}
 	}
-
-	quitChannel <- true
 }
 
 // 進捗情報を表示する。
 func printProgress(progressInfoList []ProgressInfo) {
 
 	for _, pi := range progressInfoList {
+		if pi.diskInfo == nil {
+			continue
+		}
+
 		fc := pi.fileCount
 		sc := pi.sizeCount
-		log.Printf("%s [%5d/%5d] %3.2f%% %s\n", pi.diskInfo.id, fc.processed, fc.total, sc.ProgressRate()*100, pi.processingFile)
+		log.Printf("%s [%5d/%5d] %3.2f%% %s\n",
+			pi.diskInfo.id, fc.processed, fc.total, sc.ProgressRate()*100, pi.processingFile)
 	}
 }

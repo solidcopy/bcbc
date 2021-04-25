@@ -1,6 +1,7 @@
 package calc
 
 import (
+	"io/fs"
 	"log"
 	"os"
 	"path"
@@ -8,30 +9,51 @@ import (
 )
 
 // diskファイルを探して一覧を作成する。
-func findDiskFiles() []string {
+func findDiskFiles(diskRoots []string) []string {
+	diskFiles := make([]string, 0, 1)
+
+	if len(diskRoots) == 0 {
+		diskFile, err := findDiskFileFromCurrent()
+		if err != nil {
+			diskFiles = append(diskFiles, diskFile)
+		}
+	} else {
+		for _, dr := range diskRoots {
+			diskFile := path.Join(dr, "disk")
+			_, err := os.Stat(diskFile)
+			if err == nil {
+				diskFiles = append(diskFiles, diskFile)
+			} else {
+				log.Println("指定されたディレクトリのdiskファイルが読み込めませんでした。:", dr)
+			}
+		}
+	}
+
+	return diskFiles
+}
+
+func findDiskFileFromCurrent() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	for {
-		dirEntries, err := os.ReadDir(dir)
-		if err != nil {
-			log.Fatalln(err)
-		}
+		diskFile := path.Join(dir, "disk")
 
-		for _, dirEntry := range dirEntries {
-			if !dirEntry.IsDir() && dirEntry.Name() == "disk" {
-				return []string{path.Join(dir, dirEntry.Name())}
-			}
+		_, err := os.Stat(diskFile)
+		if err == nil {
+			return diskFile, nil
 		}
 
 		if dir == "/" {
-			return []string{}
-		} else {
-			dir = path.Dir(dir)
+			break
 		}
+
+		dir = path.Dir(dir)
 	}
+
+	return "", fs.ErrNotExist
 }
 
 // DiskInfo ディスク情報
@@ -48,7 +70,7 @@ func makeDiskInfoList(diskFiles []string) []DiskInfo {
 
 	pattern := regexp.MustCompile("\\A([A-Z]\\d+)")
 
-	for i, diskFile := range diskFiles {
+	for _, diskFile := range diskFiles {
 		diskFileData, err := os.ReadFile(diskFile)
 		if err != nil {
 			log.Println("diskファイルが読み込めませんでした。:", err)
@@ -61,11 +83,12 @@ func makeDiskInfoList(diskFiles []string) []DiskInfo {
 			continue
 		}
 
+		index := len(diskInfoList)
 		diskPath := path.Dir(diskFile)
 		id := match[0]
 		group := id[0:1]
 
-		diskInfoList = append(diskInfoList, DiskInfo{i, diskPath, group, id})
+		diskInfoList = append(diskInfoList, DiskInfo{index, diskPath, group, id})
 	}
 
 	return diskInfoList

@@ -29,9 +29,11 @@ func determineService() (service string) {
 
 // 指定されたサービスを実行する。
 func runService(service string) {
+	flag.Parse()
+
 	switch service {
 	case "calc":
-		calc.Execute()
+		calc.Execute(flag.Args()[1:])
 	case "merge":
 		merge.Execute()
 	default:

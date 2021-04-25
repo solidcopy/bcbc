@@ -78,6 +78,9 @@ func hashRoutine(diskInfoList []DiskInfo, i int, progressChannel chan ProgressIn
 
 		relativePath, _ := filepath.Rel(di.path, fi.path)
 		_, err = fmt.Fprintf(hashFileIn, "%s:%x\n", relativePath, hash)
+		if err == nil {
+			err = hashFileIn.Sync()
+		}
 		if err != nil {
 			log.Println(err)
 			quitChannel <- false

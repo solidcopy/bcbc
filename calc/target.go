@@ -91,12 +91,12 @@ var filters []Filter
 
 // フィルター設定を読み込む。
 func init() {
-	vbcHome, found := os.LookupEnv("VBCHOME")
+	bcbcHome, found := os.LookupEnv("BCBCHOME")
 	if !found {
-		log.Fatalln("環境変数VBCHOMEが設定されていません。")
+		log.Fatalln("環境変数BCBCHOMEが設定されていません。")
 	}
 
-	filterFile := path.Join(vbcHome, "config", "filter.conf")
+	filterFile := path.Join(bcbcHome, "config", "filter.conf")
 	filterFileIn, err := os.Open(filterFile)
 	if err != nil {
 		log.Fatalln("フィルター設定ファイルが見つかりません。")

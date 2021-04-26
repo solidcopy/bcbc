@@ -6,8 +6,8 @@ import (
 )
 
 import (
-	"github.com/video_backup_checker/calc"
-	"github.com/video_backup_checker/merge"
+	"github.com/solidcopy/bcbc/calc"
+	"github.com/solidcopy/bcbc/merge"
 )
 
 func main() {

@@ -96,9 +96,9 @@ func makeDiskInfoList(diskFiles []string) []DiskInfo {
 
 // ハッシュファイルのパスを返す。
 func (di *DiskInfo) hashFile() string {
-	mergeDir, found := os.LookupEnv("VBCMERGE")
+	mergeDir, found := os.LookupEnv("BCBCMERGE")
 	if !found {
-		log.Fatalln("環境変数VBCMERGEが設定されていません。")
+		log.Fatalln("環境変数BCBCMERGEが設定されていません。")
 	}
 	return path.Join(mergeDir, di.id)
 }

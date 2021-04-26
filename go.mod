@@ -1,3 +1,3 @@
-module github.com/video_backup_checker
+module github.com/solidcopy/bcbc
 
 go 1.16

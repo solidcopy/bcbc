@@ -6,9 +6,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
 
@@ -85,7 +83,7 @@ func listFileInfo(diskInfo *DiskInfo) ([]FileInfo, uint64) {
 // ハッシュファイルからハッシュ計算済みのファイルセットを作成する。
 func makeHashedFileSet(diskInfo *DiskInfo) map[string]bool {
 
-	hashFileIn, err := os.Open(diskInfo.HashFile())
+	hashFileIn, err := os.Open(diskInfo.hashFile())
 	if err != nil {
 		return map[string]bool{}
 	}
@@ -99,7 +97,7 @@ func makeHashedFileSet(diskInfo *DiskInfo) map[string]bool {
 
 		tokens := strings.Split(line, ":")
 		if len(tokens) != 2 {
-			log.Fatalln("ハッシュファイルが破損しています。:", diskInfo.HashFile())
+			log.Fatalln("ハッシュファイルが破損しています。:", diskInfo.hashFile())
 		}
 
 		result[tokens[0]] = true
@@ -126,64 +124,9 @@ func listFiles(rootPath string) []string {
 	return result
 }
 
-// Filter フィルター
-type Filter struct {
-	pattern   *regexp.Regexp
-	inclusion bool
-}
-
-// フィルター一覧
-var filters []Filter
-
-// フィルター設定を読み込む。
-func init() {
-	appHome, found := os.LookupEnv("BCBCHOME")
-	if !found {
-		log.Fatalln("環境変数BCBCHOMEが設定されていません。")
-	}
-
-	filterConfigFile := path.Join(appHome, "config", "filter.conf")
-	filterFileIn, err := os.Open(filterConfigFile)
-	if err != nil {
-		log.Fatalln("フィルター設定ファイルが見つかりません。")
-	}
-	defer filterFileIn.Close()
-
-	filters = make([]Filter, 0, 10)
-
-	validFilterFile := true
-
-	filterFileScanner := bufio.NewScanner(filterFileIn)
-	for filterFileScanner.Scan() {
-		line := filterFileScanner.Text()
-		line = norm.NFC.String(line)
-
-		if len(line) < 2 || (line[0] != '+' && line[0] != '-') {
-			log.Println(line)
-			validFilterFile = false
-			break
-		}
-
-		pattern, err := regexp.Compile(line[1:])
-		if err != nil {
-			log.Println(line)
-			validFilterFile = false
-			break
-		}
-
-		inclusion := line[0] == '+'
-		filter := Filter{pattern, inclusion}
-		filters = append(filters, filter)
-	}
-
-	if !validFilterFile {
-		log.Fatalln("フィルター設定ファイルの形式が不正です。")
-	}
-}
-
 // 指定されたファイルがハッシュ対象であるかフィルター設定から判定する。
 func filterFile(normPath string) bool {
-	for _, filter := range filters {
+	for _, filter := range config.filters {
 		if filter.pattern.MatchString(normPath) {
 			return filter.inclusion
 		}

@@ -45,7 +45,7 @@ type CompletionMessage struct {
 // ハッシュルーチン。
 func hashRoutine(diskInfo *DiskInfo, progressChannel chan ProgressInfo, completionChannel chan CompletionMessage) {
 
-	hashFileOut, err := os.OpenFile(diskInfo.HashFile(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	hashFileOut, err := os.OpenFile(diskInfo.hashFile(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatalln("ハッシュファイルの書き込みに失敗しました。", err)
 	}

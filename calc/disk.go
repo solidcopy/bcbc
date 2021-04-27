@@ -87,11 +87,7 @@ func makeDiskInfoList(diskFiles []string) []DiskInfo {
 	return diskInfoList
 }
 
-// HashFile ハッシュファイルのパスを返す。
-func (di *DiskInfo) HashFile() string {
-	mergeDir, found := os.LookupEnv("BCBCMERGE")
-	if !found {
-		log.Fatalln("環境変数BCBCMERGEが設定されていません。")
-	}
-	return path.Join(mergeDir, di.id)
+// hashFile ハッシュファイルのパスを返す。
+func (di *DiskInfo) hashFile() string {
+	return path.Join(config.envs[EnvMerge], di.id)
 }

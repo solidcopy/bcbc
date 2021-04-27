@@ -2,6 +2,7 @@ package calc
 
 import (
 	"bufio"
+	"golang.org/x/text/unicode/norm"
 	"io/fs"
 	"log"
 	"os"
@@ -11,40 +12,80 @@ import (
 	"strings"
 )
 
-// ハッシュ対象ファイルの一覧を作成する。
-func listTargetFiles(di *DiskInfo) []string {
-
-	files := listFiles(di.path)
-	hashedFileSet := hashedFileSet(di)
-	unhashedTargetFileList := removeHashedFiles(files, hashedFileSet)
-	filteredTargetFileList := filterFiles(unhashedTargetFileList)
-
-	return filteredTargetFileList
+// FileInfo ファイル情報
+type FileInfo struct {
+	diskInfo *DiskInfo
+	realPath string
+	normPath string
+	_size    int64
 }
 
-// ディスク内のファイル一覧を作成する。
-func listFiles(root string) []string {
+// ファイル情報を初期化する。
+func (fi *FileInfo) init(diskInfo *DiskInfo, realPath string) {
+	fi.diskInfo = diskInfo
 
-	result := make([]string, 0, 1024)
+	fi.realPath = realPath
 
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if !d.IsDir() {
-			result = append(result, path)
-		}
-		return nil
-	})
-	if err != nil {
-		log.Fatalln(err)
+	normPath, _ := filepath.Rel(diskInfo.rootPath, realPath)
+	normPath = filepath.ToSlash(normPath)
+	normPath = norm.NFC.String(normPath)
+	fi.normPath = normPath
+
+	// sizeメソッドで遅延初期化する
+	fi._size = -1
+}
+
+func (fi *FileInfo) size() (uint64, error) {
+	if fi._size != -1 {
+		return uint64(fi._size), nil
 	}
 
-	return result
+	stat, err := os.Stat(fi.realPath)
+	if err == nil {
+		fi._size = stat.Size()
+		return uint64(fi._size), nil
+	} else {
+		return 0, nil
+	}
+}
+
+// ハッシュ対象ファイルの一覧を作成する。
+func listFileInfo(diskInfo *DiskInfo) ([]FileInfo, uint64) {
+
+	hashedFileSet := makeHashedFileSet(diskInfo)
+
+	files := listFiles(diskInfo.rootPath)
+
+	fileInfoList := make([]FileInfo, 0, len(files)-len(hashedFileSet))
+
+	var totalSize uint64
+
+	var fileInfo FileInfo
+	for _, file := range files {
+
+		(&fileInfo).init(diskInfo, file)
+
+		if hashedFileSet[fileInfo.normPath] {
+			continue
+		}
+
+		if filterFile(fileInfo.normPath) {
+			fileInfoList = append(fileInfoList, fileInfo)
+			size, err := fileInfo.size()
+			if err != nil {
+				log.Fatalln(err)
+			}
+			totalSize += uint64(size)
+		}
+	}
+
+	return fileInfoList, totalSize
 }
 
 // ハッシュファイルからハッシュ計算済みのファイルセットを作成する。
-func hashedFileSet(di *DiskInfo) map[string]bool {
+func makeHashedFileSet(diskInfo *DiskInfo) map[string]bool {
 
-	hashFile := di.hashFile()
-	hashFileIn, err := os.Open(hashFile)
+	hashFileIn, err := os.Open(diskInfo.HashFile())
 	if err != nil {
 		return map[string]bool{}
 	}
@@ -58,26 +99,31 @@ func hashedFileSet(di *DiskInfo) map[string]bool {
 
 		tokens := strings.Split(line, ":")
 		if len(tokens) != 2 {
-			log.Println("ハッシュファイルが破損しています。:", hashFile)
-			return map[string]bool{}
+			log.Fatalln("ハッシュファイルが破損しています。:", diskInfo.HashFile())
 		}
 
-		filePath := path.Join(di.path, tokens[0])
-		result[filePath] = true
+		result[tokens[0]] = true
 	}
 
 	return result
 }
 
-// ファイル一覧からハッシュ済みのファイルを除外する。
-func removeHashedFiles(fileList []string, hashedFileSet map[string]bool) []string {
-	unhashedFileList := make([]string, 0)
-	for _, file := range fileList {
-		if !hashedFileSet[file] {
-			unhashedFileList = append(unhashedFileList, file)
+// ディスク内のファイル一覧を作成する。
+func listFiles(rootPath string) []string {
+
+	result := make([]string, 0)
+
+	err := filepath.WalkDir(rootPath, func(path string, dirEntry fs.DirEntry, err error) error {
+		if !dirEntry.IsDir() {
+			result = append(result, path)
 		}
+		return nil
+	})
+	if err != nil {
+		log.Fatalln(err)
 	}
-	return unhashedFileList
+
+	return result
 }
 
 // Filter フィルター
@@ -91,13 +137,13 @@ var filters []Filter
 
 // フィルター設定を読み込む。
 func init() {
-	bcbcHome, found := os.LookupEnv("BCBCHOME")
+	appHome, found := os.LookupEnv("BCBCHOME")
 	if !found {
 		log.Fatalln("環境変数BCBCHOMEが設定されていません。")
 	}
 
-	filterFile := path.Join(bcbcHome, "config", "filter.conf")
-	filterFileIn, err := os.Open(filterFile)
+	filterConfigFile := path.Join(appHome, "config", "filter.conf")
+	filterFileIn, err := os.Open(filterConfigFile)
 	if err != nil {
 		log.Fatalln("フィルター設定ファイルが見つかりません。")
 	}
@@ -110,16 +156,17 @@ func init() {
 	filterFileScanner := bufio.NewScanner(filterFileIn)
 	for filterFileScanner.Scan() {
 		line := filterFileScanner.Text()
+		line = norm.NFC.String(line)
 
 		if len(line) < 2 || (line[0] != '+' && line[0] != '-') {
-			log.Println("1", line)
+			log.Println(line)
 			validFilterFile = false
 			break
 		}
 
 		pattern, err := regexp.Compile(line[1:])
 		if err != nil {
-			log.Println("2", line)
+			log.Println(line)
 			validFilterFile = false
 			break
 		}
@@ -135,61 +182,12 @@ func init() {
 }
 
 // 指定されたファイルがハッシュ対象であるかフィルター設定から判定する。
-func filterFile(path string) bool {
+func filterFile(normPath string) bool {
 	for _, filter := range filters {
-		if filter.pattern.MatchString(path) {
+		if filter.pattern.MatchString(normPath) {
 			return filter.inclusion
 		}
 	}
 
 	return false
-}
-
-// ファイルをフィルター設定で絞り込む。
-func filterFiles(fileList []string) []string {
-	filteredFileList := make([]string, 0)
-	for _, file := range fileList {
-		if filterFile(file) {
-			filteredFileList = append(filteredFileList, file)
-		}
-	}
-	return filteredFileList
-}
-
-// FileInfo ファイル情報
-type FileInfo struct {
-	path string
-	size int64
-}
-
-// Size ファイルサイズを返す。
-func (tf *FileInfo) Size() uint64 {
-	if tf.StatSuccess() {
-		return uint64(tf.size)
-	} else {
-		return 0
-	}
-}
-
-// StatSuccess ファイルサイズの取得が成功したかを返す。
-func (tf *FileInfo) StatSuccess() bool {
-	return tf.size >= 0
-}
-
-// ファイル情報リストを作成する。
-func toFileInfoList(targetFiles []string) []FileInfo {
-
-	fileInfoList := make([]FileInfo, 0, len(targetFiles))
-	for _, tf := range targetFiles {
-		stat, err := os.Stat(tf)
-		size := int64(-1)
-		if err == nil {
-			size = stat.Size()
-		} else {
-			log.Println(err)
-		}
-		fileInfoList = append(fileInfoList, FileInfo{tf, size})
-	}
-
-	return fileInfoList
 }

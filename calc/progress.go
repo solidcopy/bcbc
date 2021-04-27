@@ -7,26 +7,6 @@ import (
 	"time"
 )
 
-// ファイル総数を計算する。
-func calcTotalFiles(fileInfoList []FileInfo) uint {
-	var totalFiles int
-	for _, fi := range fileInfoList {
-		if fi.StatSuccess() {
-			totalFiles++
-		}
-	}
-	return uint(totalFiles)
-}
-
-// ファイルサイズの合計を計算する。
-func calcTotalSize(fileInfoList []FileInfo) uint64 {
-	var totalSize uint64
-	for _, fi := range fileInfoList {
-		totalSize += fi.Size()
-	}
-	return totalSize
-}
-
 // ProgressInfo 進捗情報
 type ProgressInfo struct {
 	diskInfo       *DiskInfo

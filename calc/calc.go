@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"time"
 )
 
@@ -17,79 +16,75 @@ func Execute(diskRoots []string) {
 	}
 
 	progressChannel := make(chan ProgressInfo)
-	quitChannel := make(chan bool)
+	completionChannel := make(chan CompletionMessage)
 	diskInfoList := makeDiskInfoList(diskFiles)
 	go watchProgress(len(diskInfoList), progressChannel)
 
 	for i := range diskInfoList {
-		go hashRoutine(diskInfoList, i, progressChannel, quitChannel)
+		go hashRoutine(&diskInfoList[i], progressChannel, completionChannel)
 	}
 
 	// 全ハッシュルーチンの終了を待つ
 	for range diskInfoList {
-		<-quitChannel
+		if completion := <-completionChannel; completion.err != nil {
+			// TODO: ここに出力しても埋もれてしまう
+			log.Printf("ディスク(%s)のハッシュ計算中に問題が発生しました。\n", completion.diskId)
+			log.Println(completion.err)
+		}
 	}
 
 	log.Println("ハッシュ計算を終了しました。")
 }
 
+// CompletionMessage 完了メッセージ
+type CompletionMessage struct {
+	diskId string
+	err    error
+}
+
 // ハッシュルーチン。
-func hashRoutine(diskInfoList []DiskInfo, i int, progressChannel chan ProgressInfo, quitChannel chan bool) {
-	di := &diskInfoList[i]
+func hashRoutine(diskInfo *DiskInfo, progressChannel chan ProgressInfo, completionChannel chan CompletionMessage) {
 
-	hashFileIn, err := os.OpenFile(di.hashFile(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	hashFileOut, err := os.OpenFile(diskInfo.HashFile(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Println(err)
-		quitChannel <- false
-		return
+		log.Fatalln("ハッシュファイルの書き込みに失敗しました。", err)
 	}
-	defer hashFileIn.Close()
+	defer hashFileOut.Close()
 
-	targetFiles := listTargetFiles(di)
-	fileInfoList := toFileInfoList(targetFiles)
+	fileInfoList, totalSize := listFileInfo(diskInfo)
 
-	totalFiles := calcTotalFiles(fileInfoList)
-	totalSize := calcTotalSize(fileInfoList)
 	progressInfo := ProgressInfo{
-		diskInfo:  di,
-		fileCount: ProgressCount{uint64(totalFiles), 0},
+		diskInfo:  diskInfo,
+		fileCount: ProgressCount{uint64(len(fileInfoList)), 0},
 		sizeCount: ProgressCount{totalSize, 0},
 		startTime: time.Now(),
 	}
 	progressChannel <- progressInfo
 
-	failFiles := make([]string, 0)
-
 	for _, fi := range fileInfoList {
-		if !fi.StatSuccess() {
-			failFiles = append(failFiles, fi.path)
-			continue
-		}
 
-		hash, err := calcHash(fi.path, progressInfo, progressChannel)
+		hash, err := calcHash(fi.realPath, progressInfo, progressChannel)
 
 		progressInfo.fileCount.Increment(uint64(1))
-		progressInfo.sizeCount.Increment(fi.Size())
+		size, _ := fi.size()
+		progressInfo.sizeCount.Increment(size)
 
 		if err != nil {
-			failFiles = append(failFiles, fi.path)
+			// TODO: ログファイルに出力する
+			log.Println(err)
 			continue
 		}
 
-		relativePath, _ := filepath.Rel(di.path, fi.path)
-		relativePath = filepath.ToSlash(relativePath)
-		_, err = fmt.Fprintf(hashFileIn, "%s:%x\n", relativePath, hash)
+		_, err = fmt.Fprintf(hashFileOut, "%s:%x\n", fi.normPath, hash)
 		if err == nil {
-			err = hashFileIn.Sync()
-		}
-		if err != nil {
-			log.Println(err)
-			quitChannel <- false
+			err = hashFileOut.Sync()
+		} else {
+			completionChannel <- CompletionMessage{diskInfo.id, err}
 			return
 		}
 	}
 
 	progressChannel <- progressInfo
 
-	quitChannel <- true
+	completionChannel <- CompletionMessage{diskInfo.id, nil}
 }

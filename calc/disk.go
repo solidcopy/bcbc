@@ -2,7 +2,6 @@ package calc
 
 import (
 	"io/fs"
-	"log"
 	"os"
 	"path"
 	"regexp"
@@ -15,7 +14,7 @@ func findDiskFiles(diskRoots []string) []string {
 	if len(diskRoots) == 0 {
 		diskFile, err := findDiskFileFromCurrent()
 		if err != nil {
-			log.Fatalln("diskファイルが見つかりませんでした。")
+			logf.Fatalln("diskファイルが見つかりませんでした。")
 		}
 		diskFiles = []string{diskFile}
 	} else {
@@ -33,7 +32,8 @@ func findDiskFiles(diskRoots []string) []string {
 func findDiskFileFromCurrent() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
-		log.Fatalln(err)
+		logf.Println("カレントディレクトリが取得できませんでした。")
+		logf.Fatalln(err)
 	}
 
 	for {
@@ -69,12 +69,12 @@ func makeDiskInfoList(diskFiles []string) []DiskInfo {
 	for _, diskFile := range diskFiles {
 		diskFileData, err := os.ReadFile(diskFile)
 		if err != nil {
-			log.Fatalln("diskファイルが読み込めませんでした。:", err)
+			logf.Fatalln("diskファイルが読み込めませんでした。:", err)
 		}
 
 		match := pattern.FindStringSubmatch(string(diskFileData))
 		if match == nil {
-			log.Fatalln("diskファイルの内容が不正です。:", diskFile)
+			logf.Fatalln("diskファイルの内容が不正です。:", diskFile)
 		}
 
 		index := len(diskInfoList)
@@ -89,5 +89,5 @@ func makeDiskInfoList(diskFiles []string) []DiskInfo {
 
 // hashFile ハッシュファイルのパスを返す。
 func (di *DiskInfo) hashFile() string {
-	return path.Join(config.envs[EnvMerge], di.id)
+	return path.Join(config.outDir(), di.id)
 }

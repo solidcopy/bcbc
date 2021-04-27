@@ -7,12 +7,23 @@ import (
 	"time"
 )
 
+// ロガー。
+// 標準出力とログファイルにログを出力する。
+var logf *log.Logger
+
 func Execute(diskRoots []string) {
-	log.Println("ハッシュ計算を開始します。")
+
+	// 初期処理
+	initEnvs()
+	logFileOut := initLogger()
+	defer logFileOut.Close()
+	initFilters()
+
+	logf.Println("ハッシュ計算を開始します。")
 
 	diskFiles := findDiskFiles(diskRoots)
 	if len(diskFiles) == 0 {
-		log.Fatalln("diskファイルが見つかりませんでした。")
+		logf.Fatalln("diskファイルが見つかりませんでした。")
 	}
 
 	progressChannel := make(chan ProgressInfo)
@@ -27,13 +38,12 @@ func Execute(diskRoots []string) {
 	// 全ハッシュルーチンの終了を待つ
 	for range diskInfoList {
 		if completion := <-completionChannel; completion.err != nil {
-			// TODO: ここに出力しても埋もれてしまう
-			log.Printf("ディスク(%s)のハッシュ計算中に問題が発生しました。\n", completion.diskId)
-			log.Println(completion.err)
+			logf.Printf("ディスク(%s)のハッシュ計算中に問題が発生しました。\n", completion.diskId)
+			logf.Println(completion.err)
 		}
 	}
 
-	log.Println("ハッシュ計算を終了しました。")
+	logf.Println("ハッシュ計算を終了しました。")
 }
 
 // CompletionMessage 完了メッセージ
@@ -45,9 +55,15 @@ type CompletionMessage struct {
 // ハッシュルーチン。
 func hashRoutine(diskInfo *DiskInfo, progressChannel chan ProgressInfo, completionChannel chan CompletionMessage) {
 
+	err := os.MkdirAll(config.outDir(), 0755)
+	if err != nil {
+		log.Println("出力ディレクトリを作成できませんでした。")
+		log.Fatalln(err)
+	}
+
 	hashFileOut, err := os.OpenFile(diskInfo.hashFile(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Fatalln("ハッシュファイルの書き込みに失敗しました。", err)
+		logf.Fatalln("ハッシュファイルの書き込みに失敗しました。", err)
 	}
 	defer hashFileOut.Close()
 
@@ -70,8 +86,9 @@ func hashRoutine(diskInfo *DiskInfo, progressChannel chan ProgressInfo, completi
 		progressInfo.sizeCount.Increment(size)
 
 		if err != nil {
-			// TODO: ログファイルに出力する
-			log.Println(err)
+			logf.Println("ハッシュ計算中にエラーが発生しました。")
+			logf.Println(fi.realPath)
+			logf.Println(err)
 			continue
 		}
 

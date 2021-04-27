@@ -3,42 +3,69 @@ package calc
 import (
 	"bufio"
 	"golang.org/x/text/unicode/norm"
+	"io"
 	"log"
 	"os"
 	"path"
 	"regexp"
+	"time"
 )
 
-// 初期化処理を行う。
-func init() {
-	initEnvs()
-	initFilters()
-}
-
 // Config 設定
-var config struct {
-	envs    map[string]string
+type Config struct {
+	homeDir string
 	filters []Filter
 }
 
+// 設定
+var config Config
+
+// ログディレクトリを返す。
+func (c *Config) logDir() string {
+	return path.Join(config.homeDir, "log")
+}
+
+// 出力ディレクトリを返す。
+func (c *Config) outDir() string {
+	return path.Join(config.homeDir, "out")
+}
+
+// 設定ディレクトリを返す。
+func (c *Config) configDir() string {
+	return path.Join(config.homeDir, "config")
+}
+
+// EnvHome 環境変数名: BCBCホームディレクトリ
 const EnvHome = "BCBCHOME"
-const EnvMerge = "BCBCMERGE"
 
 // 環境変数を取得する。
 func initEnvs() {
-	config.envs = make(map[string]string)
-
 	value, found := os.LookupEnv(EnvHome)
 	if !found {
 		log.Fatalf("環境変数%sが設定されていません。\n", EnvHome)
 	}
-	config.envs[EnvHome] = value
+	config.homeDir = value
+}
 
-	value, found = os.LookupEnv(EnvMerge)
-	if !found {
-		value = path.Join(config.envs[EnvHome], "merge")
+// ロガーを初期化する
+func initLogger() *os.File {
+	err := os.MkdirAll(config.logDir(), 0755)
+	if err != nil {
+		log.Println("ログディレクトリを作成できませんでした。")
+		log.Fatalln(err)
 	}
-	config.envs[EnvMerge] = value
+
+	logFileName := time.Now().Format("20060102150405.log")
+	logFilePath := path.Join(config.logDir(), logFileName)
+	logFileOut, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println("ログファイルを作成できませんでした。")
+		log.Fatalln(err)
+	}
+
+	logf = log.New(io.MultiWriter(os.Stdout, logFileOut), "", log.LstdFlags)
+
+	return logFileOut
 }
 
 // Filter フィルター
@@ -50,27 +77,29 @@ type Filter struct {
 // フィルター設定を読み込む。
 func initFilters() {
 
-	filterConfigFile := path.Join(config.envs[EnvHome], "config", "filter.conf")
+	filterConfigFile := path.Join(config.configDir(), "filter.conf")
 	filterFileIn, err := os.Open(filterConfigFile)
 	if err != nil {
-		log.Fatalln("フィルター設定ファイルが見つかりません。")
+		logf.Fatalln("フィルター設定ファイルが見つかりません。")
 	}
 	defer filterFileIn.Close()
 
 	config.filters = make([]Filter, 0)
 
 	filterFileScanner := bufio.NewScanner(filterFileIn)
-	for filterFileScanner.Scan() {
+	for i := 1; filterFileScanner.Scan(); i++ {
 		line := filterFileScanner.Text()
 		line = norm.NFC.String(line)
 
 		if len(line) < 2 || (line[0] != '+' && line[0] != '-') {
-			log.Fatalln("フィルター設定ファイルの形式が不正です。")
+			logf.Println("フィルター設定ファイルの形式が不正です。")
+			logf.Fatalf("%d行目: %s\n", i, line)
 		}
 
 		pattern, err := regexp.Compile(line[1:])
 		if err != nil {
-			log.Fatalln(line)
+			logf.Println("フィルター設定ファイルの形式が不正です。")
+			logf.Fatalf("%d行目: %s\n", i, line)
 		}
 
 		inclusion := line[0] == '+'

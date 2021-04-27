@@ -3,7 +3,6 @@ package calc
 import (
 	"crypto/md5"
 	"io"
-	"log"
 	"os"
 )
 
@@ -14,7 +13,7 @@ const BufferSize = 10 << 20
 func calcHash(file string, progressInfo ProgressInfo, progressInfoChannel chan ProgressInfo) ([]byte, error) {
 	fileIn, err := os.Open(file)
 	if err != nil {
-		log.Println("ハッシュ対象ファイルの読み込みに失敗しました。:", file)
+		logf.Println("ハッシュ対象ファイルの読み込みに失敗しました。:", file)
 		return nil, err
 	}
 	defer fileIn.Close()
@@ -31,7 +30,6 @@ func calcHash(file string, progressInfo ProgressInfo, progressInfoChannel chan P
 			break
 		}
 		if err != nil && err != io.EOF {
-			log.Println(err)
 			return nil, err
 		}
 

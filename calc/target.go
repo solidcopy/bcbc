@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"golang.org/x/text/unicode/norm"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,7 +70,8 @@ func listFileInfo(diskInfo *DiskInfo) ([]FileInfo, uint64) {
 			fileInfoList = append(fileInfoList, fileInfo)
 			size, err := fileInfo.size()
 			if err != nil {
-				log.Fatalln(err)
+				logf.Println("ファイルサイズの取得に失敗しました。:", fileInfo.realPath)
+				logf.Fatalln(err)
 			}
 			totalSize += uint64(size)
 		}
@@ -92,12 +92,13 @@ func makeHashedFileSet(diskInfo *DiskInfo) map[string]bool {
 	result := make(map[string]bool, 1024)
 
 	hashFileScanner := bufio.NewScanner(hashFileIn)
-	for hashFileScanner.Scan() {
+	for i := 1; hashFileScanner.Scan(); i++ {
 		line := hashFileScanner.Text()
 
 		tokens := strings.Split(line, ":")
 		if len(tokens) != 2 {
-			log.Fatalln("ハッシュファイルが破損しています。:", diskInfo.hashFile())
+			logf.Println("ハッシュファイルが破損しています。:", diskInfo.hashFile())
+			logf.Fatalln("%d行目:", line)
 		}
 
 		result[tokens[0]] = true
@@ -118,7 +119,8 @@ func listFiles(rootPath string) []string {
 		return nil
 	})
 	if err != nil {
-		log.Fatalln(err)
+		logf.Println("ファイル一覧の作成中にエラーが発生しました。")
+		logf.Fatalln(err)
 	}
 
 	return result

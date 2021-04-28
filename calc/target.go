@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"golang.org/x/text/unicode/norm"
 	"io/fs"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,11 +50,13 @@ func (fi *FileInfo) size() (uint64, error) {
 // ハッシュ対象ファイルの一覧を作成する。
 func listFileInfo(diskInfo *DiskInfo) ([]FileInfo, uint64) {
 
-	hashedFileSet := makeHashedFileSet(diskInfo)
+	hashMap := makeHashMap(diskInfo)
+
+	trimmedHashs := strings.Builder{}
 
 	files := listFiles(diskInfo.rootPath)
 
-	fileInfoList := make([]FileInfo, 0, len(files)-len(hashedFileSet))
+	fileInfoList := make([]FileInfo, 0, len(files)-len(hashMap))
 
 	var totalSize uint64
 
@@ -62,7 +65,13 @@ func listFileInfo(diskInfo *DiskInfo) ([]FileInfo, uint64) {
 
 		(&fileInfo).init(diskInfo, file)
 
-		if hashedFileSet[fileInfo.normPath] {
+		hash, found := hashMap[fileInfo.normPath]
+		if found {
+			_, err := trimmedHashs.WriteString(fileInfo.normPath + ":" + hash + "\n")
+			if err != nil {
+				logf.Println("ハッシュファイルの書き込みに失敗しました。")
+				logf.Fatalln(err)
+			}
 			continue
 		}
 
@@ -73,23 +82,29 @@ func listFileInfo(diskInfo *DiskInfo) ([]FileInfo, uint64) {
 				logf.Println("ファイルサイズの取得に失敗しました。:", fileInfo.realPath)
 				logf.Fatalln(err)
 			}
-			totalSize += uint64(size)
+			totalSize += size
 		}
+	}
+
+	err := ioutil.WriteFile(diskInfo.hashFile(), []byte(trimmedHashs.String()), 0644)
+	if err != nil {
+		logf.Println("ハッシュファイルの作成に失敗しました。")
+		logf.Fatalln(err)
 	}
 
 	return fileInfoList, totalSize
 }
 
 // ハッシュファイルからハッシュ計算済みのファイルセットを作成する。
-func makeHashedFileSet(diskInfo *DiskInfo) map[string]bool {
+func makeHashMap(diskInfo *DiskInfo) map[string]string {
 
 	hashFileIn, err := os.Open(diskInfo.hashFile())
 	if err != nil {
-		return map[string]bool{}
+		return map[string]string{}
 	}
 	defer hashFileIn.Close()
 
-	result := make(map[string]bool, 1024)
+	result := make(map[string]string, 1024)
 
 	hashFileScanner := bufio.NewScanner(hashFileIn)
 	for i := 1; hashFileScanner.Scan(); i++ {
@@ -101,7 +116,7 @@ func makeHashedFileSet(diskInfo *DiskInfo) map[string]bool {
 			logf.Fatalln("%d行目:", line)
 		}
 
-		result[tokens[0]] = true
+		result[tokens[0]] = tokens[1]
 	}
 
 	return result

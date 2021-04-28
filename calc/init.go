@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -90,6 +91,10 @@ func initFilters() {
 	for i := 1; filterFileScanner.Scan(); i++ {
 		line := filterFileScanner.Text()
 		line = norm.NFC.String(line)
+
+		if strings.TrimSpace(line) == "" || line[0] == '#' {
+			continue
+		}
 
 		if len(line) < 2 || (line[0] != '+' && line[0] != '-') {
 			logf.Println("フィルター設定ファイルの形式が不正です。")

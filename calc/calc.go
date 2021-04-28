@@ -1,9 +1,14 @@
 package calc
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
+	"path"
+	"path/filepath"
+	"regexp"
+	"sort"
 	"time"
 )
 
@@ -44,6 +49,66 @@ func Execute(diskRoots []string) {
 	}
 
 	logf.Println("ハッシュ計算を終了しました。")
+
+	logf.Println("ハッシュファイルの統合を開始します。")
+
+	mergedHashMap := make(map[string][]string)
+
+	outputFiles, err := filepath.Glob(path.Join(config.outDir(), "*"))
+	if err != nil {
+		logf.Println("出力ファイルの一覧取得に失敗しました。")
+		logf.Fatal(err)
+	}
+
+	hashFilePattern := regexp.MustCompile("^([A-Z])\\d+$")
+
+	for _, outputFile := range outputFiles {
+		fileName := filepath.Base(outputFile)
+		subMatches := hashFilePattern.FindStringSubmatch(fileName)
+		if len(subMatches) == 0 {
+			continue
+		}
+
+		group := subMatches[1]
+
+		mergedHashes := mergedHashMap[group]
+
+		hashFileIn, err := os.Open(outputFile)
+		if err != nil {
+			logf.Println("ハッシュファイルの読み込みに失敗しました。", outputFile)
+			logf.Fatalln(err)
+		}
+		for hashFileScanner := bufio.NewScanner(hashFileIn); hashFileScanner.Scan(); {
+			line := hashFileScanner.Text()
+			if line != "" {
+				mergedHashes = append(mergedHashes, line)
+			}
+		}
+		mergedHashMap[group] = mergedHashes
+	}
+
+	for group, mergedHashs := range mergedHashMap {
+		sort.Strings(mergedHashs)
+		mergedHashFile := path.Join(config.outDir(), group)
+
+		mergedHashFileOut, err := os.OpenFile(mergedHashFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			logf.Println("統合ハッシュファイルの作成に失敗しました。")
+			logf.Fatal(err)
+		}
+
+		for _, line := range mergedHashs {
+			_, err := fmt.Fprintln(mergedHashFileOut, line)
+			if err != nil {
+				logf.Println("統合ハッシュファイルの書き込みに失敗しました。")
+				logf.Fatal(err)
+			}
+		}
+
+		mergedHashFileOut.Close()
+	}
+
+	logf.Println("ハッシュファイルの統合を終了しました。")
 }
 
 // CompletionMessage 完了メッセージ

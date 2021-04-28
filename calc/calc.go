@@ -95,7 +95,8 @@ func hashRoutine(diskInfo *DiskInfo, progressChannel chan ProgressInfo, completi
 		_, err = fmt.Fprintf(hashFileOut, "%s:%x\n", fi.normPath, hash)
 		if err == nil {
 			err = hashFileOut.Sync()
-		} else {
+		}
+		if err != nil {
 			completionChannel <- CompletionMessage{diskInfo.id, err}
 			return
 		}

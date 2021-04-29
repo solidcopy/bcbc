@@ -1,4 +1,4 @@
-package calc
+package bcbc
 
 import (
 	"bufio"
@@ -33,7 +33,7 @@ func (c *Config) outDir() string {
 
 // 設定ディレクトリを返す。
 func (c *Config) configDir() string {
-	return path.Join(config.homeDir, "config")
+	return path.Join(config.homeDir, "configs")
 }
 
 // EnvHome 環境変数名: BCBCホームディレクトリ

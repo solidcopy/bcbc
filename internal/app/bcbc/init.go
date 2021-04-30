@@ -51,18 +51,12 @@ func initEnvs() {
 // ロガーを初期化する
 func initLogger() *os.File {
 	err := os.MkdirAll(config.logDir(), 0755)
-	if err != nil {
-		log.Println("ログディレクトリを作成できませんでした。")
-		log.Fatalln(err)
-	}
+	fatalMessageError(err, "ログディレクトリを作成できませんでした。: %s\n", config.logDir())
 
 	logFileName := time.Now().Format("20060102150405.log")
 	logFilePath := path.Join(config.logDir(), logFileName)
 	logFileOut, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Println("ログファイルを作成できませんでした。")
-		log.Fatalln(err)
-	}
+	fatalMessageError(err, "ログファイルを作成できませんでした。: %s\n", logFilePath)
 
 	logf = log.New(io.MultiWriter(os.Stdout, logFileOut), "", log.LstdFlags)
 
@@ -80,9 +74,7 @@ func initFilters() {
 
 	filterConfigFile := path.Join(config.configDir(), "filter.conf")
 	filterFileIn, err := os.Open(filterConfigFile)
-	if err != nil {
-		logf.Fatalln("フィルター設定ファイルが見つかりません。")
-	}
+	fatalMessageError(err, "フィルター設定ファイルが見つかりません。\n")
 	defer filterFileIn.Close()
 
 	config.filters = make([]Filter, 0)
@@ -96,16 +88,11 @@ func initFilters() {
 			continue
 		}
 
-		if len(line) < 2 || (line[0] != '+' && line[0] != '-') {
-			logf.Println("フィルター設定ファイルの形式が不正です。")
-			logf.Fatalf("%d行目: %s\n", i, line)
-		}
+		malformed := len(line) < 2 || (line[0] != '+' && line[0] != '-')
+		fatalMessageIf(malformed, "フィルター設定ファイルの形式が不正です。: %d行目: %s\n", i, line)
 
 		pattern, err := regexp.Compile(line[1:])
-		if err != nil {
-			logf.Println("フィルター設定ファイルの形式が不正です。")
-			logf.Fatalf("%d行目: %s\n", i, line)
-		}
+		fatalMessageError(err, "フィルター設定ファイルの形式が不正です。: %d行目: %s\n", i, line)
 
 		inclusion := line[0] == '+'
 		filter := Filter{pattern, inclusion}

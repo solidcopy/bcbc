@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"time"
 )
 
 // ロガー。
 // 標準出力とログファイルにログを出力する。
 var logf *log.Logger
 
+// Execute エントリーポイント。
 func Execute(diskRoots []string) {
 
 	// 初期処理
@@ -24,12 +24,18 @@ func Execute(diskRoots []string) {
 	defer logFileOut.Close()
 	initFilters()
 
+	executeHashCalculation(diskRoots)
+	executeHashFileIntegration()
+}
+
+// ハッシュ計算を実行する。
+func executeHashCalculation(diskRoots []string) {
+
 	logf.Println("ハッシュ計算を開始します。")
+	defer logf.Println("ハッシュ計算を終了しました。")
 
 	diskFiles := findDiskFiles(diskRoots)
-	if len(diskFiles) == 0 {
-		logf.Fatalln("diskファイルが見つかりませんでした。")
-	}
+	fatalMessageIf(len(diskFiles) == 0, "diskファイルが見つかりませんでした。\n")
 
 	progressChannel := make(chan ProgressInfo)
 	completionChannel := make(chan CompletionMessage)
@@ -47,18 +53,18 @@ func Execute(diskRoots []string) {
 			logf.Println(completion.err)
 		}
 	}
+}
 
-	logf.Println("ハッシュ計算を終了しました。")
+// ハッシュファイル統合を実行する。
+func executeHashFileIntegration() {
 
 	logf.Println("ハッシュファイルの統合を開始します。")
+	defer logf.Println("ハッシュファイルの統合を終了しました。")
 
 	mergedHashMap := make(map[string][]string)
 
 	outputFiles, err := filepath.Glob(path.Join(config.outDir(), "*"))
-	if err != nil {
-		logf.Println("出力ファイルの一覧取得に失敗しました。")
-		logf.Fatal(err)
-	}
+	fatalMessageError(err, "出力ファイルの一覧取得に失敗しました。\n")
 
 	hashFilePattern := regexp.MustCompile("^([A-Z])\\d+$")
 
@@ -74,10 +80,7 @@ func Execute(diskRoots []string) {
 		mergedHashes := mergedHashMap[group]
 
 		hashFileIn, err := os.Open(outputFile)
-		if err != nil {
-			logf.Println("ハッシュファイルの読み込みに失敗しました。", outputFile)
-			logf.Fatalln(err)
-		}
+		fatalMessageError(err, "ハッシュファイルの読み込みに失敗しました。: %s\n", outputFile)
 		for hashFileScanner := bufio.NewScanner(hashFileIn); hashFileScanner.Scan(); {
 			line := hashFileScanner.Text()
 			if line != "" {
@@ -87,87 +90,18 @@ func Execute(diskRoots []string) {
 		mergedHashMap[group] = mergedHashes
 	}
 
-	for group, mergedHashs := range mergedHashMap {
-		sort.Strings(mergedHashs)
+	for group, mergedHashes := range mergedHashMap {
+		sort.Strings(mergedHashes)
 		mergedHashFile := path.Join(config.outDir(), group)
 
 		mergedHashFileOut, err := os.OpenFile(mergedHashFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-		if err != nil {
-			logf.Println("統合ハッシュファイルの作成に失敗しました。")
-			logf.Fatal(err)
-		}
+		fatalMessageError(err, "統合ハッシュファイルの作成に失敗しました。\n")
 
-		for _, line := range mergedHashs {
+		for _, line := range mergedHashes {
 			_, err := fmt.Fprintln(mergedHashFileOut, line)
-			if err != nil {
-				logf.Println("統合ハッシュファイルの書き込みに失敗しました。")
-				logf.Fatal(err)
-			}
+			fatalMessageError(err, "統合ハッシュファイルの書き込みに失敗しました。\n")
 		}
 
 		mergedHashFileOut.Close()
 	}
-
-	logf.Println("ハッシュファイルの統合を終了しました。")
-}
-
-// CompletionMessage 完了メッセージ
-type CompletionMessage struct {
-	diskId string
-	err    error
-}
-
-// ハッシュルーチン。
-func hashRoutine(diskInfo *DiskInfo, progressChannel chan ProgressInfo, completionChannel chan CompletionMessage) {
-
-	err := os.MkdirAll(config.outDir(), 0755)
-	if err != nil {
-		log.Println("出力ディレクトリを作成できませんでした。")
-		log.Fatalln(err)
-	}
-
-	hashFileOut, err := os.OpenFile(diskInfo.hashFile(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		logf.Fatalln("ハッシュファイルの書き込みに失敗しました。", err)
-	}
-	defer hashFileOut.Close()
-
-	fileInfoList, totalSize := listFileInfo(diskInfo)
-
-	progressInfo := ProgressInfo{
-		diskInfo:  diskInfo,
-		fileCount: ProgressCount{uint64(len(fileInfoList)), 0},
-		sizeCount: ProgressCount{totalSize, 0},
-		startTime: time.Now(),
-	}
-	progressChannel <- progressInfo
-
-	for _, fi := range fileInfoList {
-
-		hash, err := calcHash(fi.realPath, progressInfo, progressChannel)
-
-		progressInfo.fileCount.Increment(uint64(1))
-		size, _ := fi.size()
-		progressInfo.sizeCount.Increment(size)
-
-		if err != nil {
-			logf.Println("ハッシュ計算中にエラーが発生しました。")
-			logf.Println(fi.realPath)
-			logf.Println(err)
-			continue
-		}
-
-		_, err = fmt.Fprintf(hashFileOut, "%s:%x\n", fi.normPath, hash)
-		if err == nil {
-			err = hashFileOut.Sync()
-		}
-		if err != nil {
-			completionChannel <- CompletionMessage{diskInfo.id, err}
-			return
-		}
-	}
-
-	progressChannel <- progressInfo
-
-	completionChannel <- CompletionMessage{diskInfo.id, nil}
 }

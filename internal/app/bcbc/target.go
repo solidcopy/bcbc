@@ -68,29 +68,20 @@ func listFileInfo(diskInfo *DiskInfo) ([]FileInfo, uint64) {
 		hash, found := hashMap[fileInfo.normPath]
 		if found {
 			_, err := trimmedHashs.WriteString(fileInfo.normPath + ":" + hash + "\n")
-			if err != nil {
-				logf.Println("ハッシュファイルの書き込みに失敗しました。")
-				logf.Fatalln(err)
-			}
+			fatalMessageError(err, "ハッシュファイルの書き込みに失敗しました。\n")
 			continue
 		}
 
 		if filterFile(fileInfo.normPath) {
 			fileInfoList = append(fileInfoList, fileInfo)
 			size, err := fileInfo.size()
-			if err != nil {
-				logf.Println("ファイルサイズの取得に失敗しました。:", fileInfo.realPath)
-				logf.Fatalln(err)
-			}
+			fatalMessageError(err, "ファイルサイズの取得に失敗しました。: %s\n", fileInfo.realPath)
 			totalSize += size
 		}
 	}
 
 	err := ioutil.WriteFile(diskInfo.hashFile(), []byte(trimmedHashs.String()), 0644)
-	if err != nil {
-		logf.Println("ハッシュファイルの作成に失敗しました。")
-		logf.Fatalln(err)
-	}
+	fatalMessageError(err, "ハッシュファイルの作成に失敗しました。\n")
 
 	return fileInfoList, totalSize
 }
@@ -111,10 +102,7 @@ func makeHashMap(diskInfo *DiskInfo) map[string]string {
 		line := hashFileScanner.Text()
 
 		tokens := strings.Split(line, ":")
-		if len(tokens) != 2 {
-			logf.Println("ハッシュファイルが破損しています。:", diskInfo.hashFile())
-			logf.Fatalln("%d行目:", line)
-		}
+		fatalMessageIf(len(tokens) != 2, "ハッシュファイルが破損しています。: %s : %d行目:\n", diskInfo.hashFile(), i)
 
 		result[tokens[0]] = tokens[1]
 	}
@@ -133,10 +121,7 @@ func listFiles(rootPath string) []string {
 		}
 		return nil
 	})
-	if err != nil {
-		logf.Println("ファイル一覧の作成中にエラーが発生しました。")
-		logf.Fatalln(err)
-	}
+	fatalMessageError(err, "ファイル一覧の作成中にエラーが発生しました。\n")
 
 	return result
 }

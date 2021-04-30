@@ -13,9 +13,7 @@ func findDiskFiles(diskRoots []string) []string {
 
 	if len(diskRoots) == 0 {
 		diskFile, err := findDiskFileFromCurrent()
-		if err != nil {
-			logf.Fatalln("diskファイルが見つかりませんでした。")
-		}
+		fatalMessageError(err, "diskファイルが見つかりませんでした。\n")
 		diskFiles = []string{diskFile}
 	} else {
 		diskFiles = make([]string, 0, len(diskRoots))
@@ -31,10 +29,7 @@ func findDiskFiles(diskRoots []string) []string {
 // カレントディレクトリの起点としてdiskファイルを探す。
 func findDiskFileFromCurrent() (string, error) {
 	dir, err := os.Getwd()
-	if err != nil {
-		logf.Println("カレントディレクトリが取得できませんでした。")
-		logf.Fatalln(err)
-	}
+	fatalMessageError(err, "カレントディレクトリが取得できませんでした。\n")
 
 	for {
 		diskFile := path.Join(dir, "disk")
@@ -68,14 +63,10 @@ func makeDiskInfoList(diskFiles []string) []DiskInfo {
 
 	for _, diskFile := range diskFiles {
 		diskFileData, err := os.ReadFile(diskFile)
-		if err != nil {
-			logf.Fatalln("diskファイルが読み込めませんでした。:", err)
-		}
+		fatalMessageError(err, "diskファイルが読み込めませんでした。\n")
 
 		match := pattern.FindStringSubmatch(string(diskFileData))
-		if match == nil {
-			logf.Fatalln("diskファイルの内容が不正です。:", diskFile)
-		}
+		fatalMessageIf(match == nil, "diskファイルの内容が不正です。: %s\n", diskFile)
 
 		index := len(diskInfoList)
 		id := match[0]

@@ -56,7 +56,12 @@ func listFileInfo(diskInfo *DiskInfo) ([]FileInfo, uint64) {
 
 	files := listFiles(diskInfo.rootPath)
 
-	fileInfoList := make([]FileInfo, 0, len(files)-len(hashMap))
+	capacity := len(files) - len(hashMap)
+	if capacity < 0 {
+		capacity = 0
+	}
+
+	fileInfoList := make([]FileInfo, 0, capacity)
 
 	var totalSize uint64
 

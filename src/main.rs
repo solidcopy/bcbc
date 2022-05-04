@@ -1,3 +1,5 @@
+use bcbc::*;
+
 fn main() {
-    println!("Hello, world!");
+    ctrl_c();
 }

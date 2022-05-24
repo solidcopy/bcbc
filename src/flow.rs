@@ -37,7 +37,7 @@ pub fn main_procedure(
         run_options.output_folder(),
         filters,
         progress_tx,
-    );
+    )?;
     // ハッシュ計算の完了を待つ
     calc::wait_calculations(worker_handles)?;
     // ハッシュファイルを統合する

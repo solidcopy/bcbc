@@ -21,30 +21,53 @@ use crate::target_file::TargetFile;
 
 /// バッファサイズ
 const BUFFER_SIZE: usize = 10 << 20;
+/// スタックサイズ
+const STACK_SIZE: usize = BUFFER_SIZE + (2 << 20);
 
-/// ハッシュ計算スレッドを開始する。
+/// ディスクごとにハッシュ計算スレッドを開始する。
 pub fn start_calculation(
     disk_info_list: Vec<DiskInfo>,
     output_folder: &Path,
     filters: Filters,
     progress_tx: Sender<ProgressUpdate>,
-) -> HashMap<String, JoinHandle<Result<(), Errors>>> {
+) -> Result<HashMap<String, JoinHandle<Result<(), Errors>>>, Errors> {
     let mut worker_handles = HashMap::with_capacity(disk_info_list.len());
 
     for disk_info in disk_info_list {
-        let output_folder = output_folder.to_path_buf();
-        let filters = filters.clone();
-        let progress_tx = progress_tx.clone();
-
+        // マップのキーにするためコピーを取っておく
         let disk_id = disk_info.id.clone();
 
-        let worker_handle =
-            thread::spawn(move || calc_procedure(disk_info, output_folder, filters, progress_tx));
+        let worker_handle = start_calculation_thread(
+            disk_info,
+            output_folder.to_path_buf(),
+            filters.clone(),
+            progress_tx.clone(),
+        )?;
 
         worker_handles.insert(disk_id, worker_handle);
     }
 
-    worker_handles
+    Ok(worker_handles)
+}
+
+/// ハッシュ計算スレッドを開始する。
+fn start_calculation_thread(
+    disk_info: DiskInfo,
+    output_folder: PathBuf,
+    filters: Filters,
+    progress_tx: Sender<ProgressUpdate>,
+) -> Result<JoinHandle<Result<(), Errors>>, Errors> {
+    match thread::Builder::new()
+        .stack_size(STACK_SIZE)
+        .spawn(move || calc_procedure(disk_info, output_folder, filters, progress_tx))
+    {
+        Ok(handle) => Ok(handle),
+        Err(error) => Err(
+            log::make_error!("ハッシュ計算スレッドを開始できませんでした。")
+                .with(&error)
+                .as_errors(),
+        ),
+    }
 }
 
 /// 進捗更新メッセージを送信する。

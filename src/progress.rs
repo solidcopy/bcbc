@@ -242,6 +242,7 @@ impl DiskProgressStatus {
     }
 }
 
+/// ディスク進捗
 struct DiskProgress {
     status: DiskProgressStatus,
     disk_id: Option<String>,
@@ -304,6 +305,7 @@ impl DiskProgress {
     }
 }
 
+/// 進捗更新メッセージタイプ
 #[derive(Debug, PartialEq)]
 enum ProgressUpdateType {
     Init,

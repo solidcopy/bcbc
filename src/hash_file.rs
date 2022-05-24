@@ -184,34 +184,6 @@ pub fn add_hash_file_line(mut buff: String, target_filepath: &Path, hash: &Diges
     buff
 }
 
-// /// すでにあるハッシュ情報を一時ハッシュファイルに出力する。
-// pub fn write_temp_hash_file(
-//     temp_hash_file_path: &Path,
-//     hash_info_map: HashMap<String, Digest>,
-//     &target_files: Vec<FileInfo>,
-// ) -> Result<Vec<FileInfo>, Errors> {
-//     let mut calc_target_files = vec![];
-//
-
-//
-//     for target_file in target_files {
-//         match hash_info_map.get(&target_file.normalized_path) {
-//             Some(hash) => {
-//                 if let Err(_) = temp_hash_file.write(&target_file.normalized_path.as_bytes()) {
-//                     return ext_errors(format!(
-//                         "ハッシュファイルに書き込みできません。: {}",
-//                         temp_hash_file_path.to_str().unwrap()
-//                     ));
-//                 }
-//             }
-//             None => calc_target_files.push(target_file),
-//         }
-//     }
-//
-//     Ok(calc_target_files)
-// }
-//
-
 /// ハッシュファイルのバックアップを削除する。
 pub fn delete_backup(backup_filepath: Option<PathBuf>) {
     if let Some(backup_filepath) = backup_filepath {

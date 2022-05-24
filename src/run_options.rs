@@ -7,8 +7,6 @@ use crate::log::{self, Errors};
 pub struct RunOptions {
     /// カレントフォルダ
     pub current_folder: PathBuf,
-    // /// ホームフォルダ
-    // home_folder: PathBuf,
     /// 出力フォルダ
     output_folder: PathBuf,
     /// 設定フォルダ
@@ -45,11 +43,6 @@ impl RunOptions {
         self.current_folder.as_path()
     }
 
-    // /// ホームフォルダを返す。
-    // pub fn home_folder(&self) -> &Path {
-    //     self.home_folder.as_path()
-    // }
-
     /// 出力フォルダのパスを返す。
     pub fn output_folder(&self) -> &Path {
         self.output_folder.as_path()
@@ -64,14 +57,6 @@ impl RunOptions {
     pub fn args(&self) -> &Vec<String> {
         &self.args
     }
-
-    // /// 指定された環境変数の値を返す。
-    // pub fn env(&self, env_name: &str) -> Option<&String> {
-    //     match self.envs.get(env_name) {
-    //         Some(env_value) => Some(&env_value),
-    //         None => None,
-    //     }
-    // }
 
     /// 指定された環境変数の値を返す。
     pub fn required_env(&self, env_name: &str) -> Result<&String, Errors> {

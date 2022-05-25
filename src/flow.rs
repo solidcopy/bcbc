@@ -25,7 +25,8 @@ pub fn main_procedure(
     // フィルター設定を読み込んで一覧にする
     let filters = filter::load_filters(&run_options)?;
     // ディスク情報を一覧にする
-    let disk_info_list = disk::list_disk_info(run_options.current_folder(), run_options.args())?;
+    let disk_info_list =
+        disk::list_disk_info(run_options.current_folder(), run_options.disk_roots())?;
     // 出力フォルダの作成
     hash_file::ensure_output_folder(run_options.output_folder())?;
 

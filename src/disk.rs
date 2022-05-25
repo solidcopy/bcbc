@@ -17,8 +17,10 @@ pub struct DiskInfo {
 pub static DISK_ID_PATTERN: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[A-Z]\d+$").unwrap());
 
 /// ディスク情報一覧を作成する。
-pub fn list_disk_info(current_folder: &Path, args: &Vec<String>) -> Result<Vec<DiskInfo>, Errors> {
-    let disk_roots = get_disk_roots(args);
+pub fn list_disk_info(
+    current_folder: &Path,
+    disk_roots: &Vec<PathBuf>,
+) -> Result<Vec<DiskInfo>, Errors> {
     let disk_files = list_disk_files(current_folder, &disk_roots)?;
 
     let mut errors = Vec::<Error>::new();
@@ -30,12 +32,6 @@ pub fn list_disk_info(current_folder: &Path, args: &Vec<String>) -> Result<Vec<D
 
     index_disk_info(&mut disk_info_list);
     Ok(disk_info_list)
-}
-
-/// コマンドライン引数からディスクルート一覧を作成する。
-fn get_disk_roots(args: &Vec<String>) -> Vec<PathBuf> {
-    // 1つ目はこのプログラムのパス
-    args.iter().skip(1).map(|arg| PathBuf::from(arg)).collect()
 }
 
 /// diskファイル一覧を作成する。

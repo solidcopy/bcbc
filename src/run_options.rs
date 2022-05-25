@@ -11,8 +11,8 @@ pub struct RunOptions {
     output_folder: PathBuf,
     /// 設定フォルダ
     config_folder: PathBuf,
-    /// コマンドライン引数一覧
-    args: Vec<String>,
+    /// ディスクルート一覧
+    disk_roots: Vec<PathBuf>,
     /// 環境変数マップ
     envs: HashMap<String, String>,
 }
@@ -23,17 +23,23 @@ impl RunOptions {
         args: Vec<String>,
         envs: HashMap<String, String>,
     ) -> Result<RunOptions, Errors> {
+        // コマンドライン引数をディスクルートにパースする
+        // 1つ目はこのプログラムのパス
+        let mut disk_roots = Vec::with_capacity(args.len());
+        for arg in args.iter().skip(1) {
+            disk_roots.push(tilde_to_home(PathBuf::from(arg)));
+        }
+        // BCBCHOMEから各パスを求める
         let home_folder = require_env(&envs, "BCBCHOME")?;
-        let home_folder = PathBuf::from(home_folder);
+        let home_folder = tilde_to_home(PathBuf::from(home_folder));
         let output_folder = home_folder.join("out");
         let config_folder = home_folder.join("configs");
 
         Ok(RunOptions {
             current_folder,
-            // home_folder,
             output_folder,
             config_folder,
-            args,
+            disk_roots,
             envs,
         })
     }
@@ -53,9 +59,9 @@ impl RunOptions {
         self.config_folder.as_path()
     }
 
-    /// コマンドライン引数一覧を返す。
-    pub fn args(&self) -> &Vec<String> {
-        &self.args
+    /// ディスクルート一覧を返す。
+    pub fn disk_roots(&self) -> &Vec<PathBuf> {
+        &self.disk_roots
     }
 
     /// 指定された環境変数の値を返す。
@@ -73,5 +79,16 @@ fn require_env<'a>(
     match envs.get(env_name) {
         Some(env_value) => Ok(env_value),
         None => Err(log::make_error!("環境変数{}が設定されていません。", env_name).as_errors()),
+    }
+}
+
+/// 指定されたパスが"~"で始まる場合、ホームフォルダに置き換える。
+fn tilde_to_home(path: PathBuf) -> PathBuf {
+    if path.starts_with("~") {
+        let suffix = path.strip_prefix("~").unwrap();
+        let home = dirs::home_dir().unwrap();
+        home.join(suffix)
+    } else {
+        path
     }
 }

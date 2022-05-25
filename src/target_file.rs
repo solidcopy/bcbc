@@ -15,8 +15,14 @@ pub struct TargetFile {
 
 impl TargetFile {
     /// インスタンスを作成する。
-    pub fn new(actual_path: PathBuf, size: u64) -> TargetFile {
-        let normalized_path = actual_path.to_str().unwrap().nfc().to_string();
+    pub fn new(disk_root: &Path, actual_path: PathBuf, size: u64) -> TargetFile {
+        let normalized_path = actual_path
+            .strip_prefix(disk_root)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .nfc()
+            .to_string();
         let normalized_path = PathBuf::from(normalized_path);
 
         TargetFile {
@@ -40,13 +46,14 @@ impl TargetFile {
 /// 対象ファイルを一覧にする。
 pub fn list_target_files(disk_root: &Path, filters: &Filters) -> Vec<TargetFile> {
     let mut target_files = vec![];
-    collect_dir_entries_recursive(&mut target_files, disk_root, filters);
+    collect_dir_entries_recursive(&mut target_files, disk_root, disk_root, filters);
     target_files
 }
 
 /// 指定されたフォルダ配下のエントリーを一覧に追加する。
 fn collect_dir_entries_recursive(
     target_files: &mut Vec<TargetFile>,
+    disk_root: &Path,
     folder: &Path,
     filters: &Filters,
 ) {
@@ -64,11 +71,13 @@ fn collect_dir_entries_recursive(
                     if metadata.is_dir() {
                         collect_dir_entries_recursive(
                             target_files,
+                            disk_root,
                             dir_entry_path.as_path(),
                             filters,
                         );
-                    } else if filters.is_target(dir_entry_path.as_path()) {
-                        let target_file = TargetFile::new(dir_entry_path, metadata.len());
+                    } else if filters.is_target(dir_entry_path.strip_prefix(disk_root).unwrap()) {
+                        let target_file =
+                            TargetFile::new(disk_root, dir_entry_path, metadata.len());
                         target_files.push(target_file);
                     }
                 }

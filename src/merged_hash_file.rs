@@ -107,6 +107,7 @@ fn merge_hash_files_contents(hash_filepaths: &Vec<PathBuf>) -> Result<String, Er
     let mut merged_contents = String::new();
     for line in lines {
         merged_contents.push_str(line);
+        merged_contents.push('\n');
     }
 
     Ok(merged_contents)

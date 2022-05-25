@@ -174,11 +174,7 @@ fn to_hash_file_contents(hash_info_map: &HashMap<PathBuf, Digest>) -> String {
 pub fn add_hash_file_line(mut buff: String, target_filepath: &Path, hash: &Digest) -> String {
     buff.push_str(target_filepath.to_str().unwrap());
     buff.push(':');
-    buff.push_str(
-        String::from_utf8(hash.to_ascii_lowercase())
-            .unwrap()
-            .as_str(),
-    );
+    buff.push_str(hex::encode(hash.to_vec()).as_str());
     buff.push('\n');
 
     buff

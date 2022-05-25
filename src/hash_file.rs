@@ -106,7 +106,7 @@ pub fn backup(hash_filepath: &Path) -> Result<Option<PathBuf>, Errors> {
         return Ok(None);
     }
 
-    let backup_filepath = hash_filepath.join(".backup");
+    let backup_filepath = hash_filepath.with_extension(".backup");
     match fs::copy(hash_filepath, backup_filepath.as_path()) {
         Ok(_) => Ok(Some(backup_filepath)),
         Err(error) => Err(

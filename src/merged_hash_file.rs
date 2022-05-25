@@ -61,7 +61,14 @@ fn group_hash_files(hash_files: Vec<PathBuf>) -> HashMap<char, Vec<PathBuf>> {
 
     for hash_file in hash_files {
         // ファイル名の1文字目
-        let disk_group = hash_file.to_str().unwrap().chars().next().unwrap();
+        let disk_group = hash_file
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .chars()
+            .next()
+            .unwrap();
         match hash_file_map.get_mut(&disk_group) {
             Some(file_group) => file_group.push(hash_file),
             None => {

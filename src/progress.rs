@@ -21,11 +21,11 @@ fn progress_monitor_routine(rx: Receiver<ProgressUpdate>) -> Result<(), Errors> 
 
     loop {
         let progress_update = receive_progress_update(&rx)?;
+        let is_done = progress_update.message_type == ProgressUpdateType::Done;
         progress_summary.update(progress_update)?;
 
-        // 前回の受信から1秒以上経過していれば進捗状況を出力する
-        let elapsed = prev_output_time.elapsed().as_secs();
-        if elapsed >= 1 {
+        // ファイルの処理完了か、前回の出力から1秒以上経過していれば進捗状況を出力する
+        if is_done || prev_output_time.elapsed().as_secs() >= 1 {
             log::info(&progress_summary.log_line()?);
             prev_output_time = Instant::now();
         }
@@ -288,7 +288,6 @@ impl DiskProgress {
             ProgressUpdateType::Done => {
                 self.status = DiskProgressStatus::WaitNewFile;
                 self.number_of_done_files += 1;
-                self.current_file = None;
             }
         }
     }

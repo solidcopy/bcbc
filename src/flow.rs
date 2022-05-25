@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
 
 use crate::calc;
 use crate::disk;
@@ -40,6 +42,8 @@ pub fn main_procedure(
     )?;
     // ハッシュ計算の完了を待つ
     calc::wait_calculations(worker_handles)?;
+    // 最後の進捗状況を表示するため一瞬待機する
+    thread::sleep(Duration::from_millis(10));
     // ハッシュファイルを統合する
     merged_hash_file::integrate_hash_files(run_options.output_folder())?;
 

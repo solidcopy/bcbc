@@ -9,7 +9,11 @@ use std::path::PathBuf;
 /// 進捗監視スレッドを開始する。
 pub fn start_progress_monitor() -> Sender<ProgressUpdate> {
     let (tx, rx) = mpsc::channel::<ProgressUpdate>();
-    thread::spawn(move || progress_monitor_routine(rx));
+    thread::spawn(move || {
+        if let Err(errors) = progress_monitor_routine(rx) {
+            log::log_errors(errors);
+        };
+    });
     tx
 }
 

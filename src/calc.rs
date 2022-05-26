@@ -233,7 +233,7 @@ pub fn wait_calculations(
             if worker_handle.is_finished() {
                 finished = true;
             } else {
-                check_interruption(&interruption_handler);
+                check_interruption(&interruption_handler)?;
                 thread::sleep(check_interval);
             }
         }
@@ -255,9 +255,10 @@ pub fn wait_calculations(
     Ok(())
 }
 
-/// Ctrl+Cによる割り込みを受けていたらパニックを発生させる。
-fn check_interruption(interruption_handler: &Arc<AtomicBool>) {
-    if interruption_handler.load(Ordering::Relaxed) {
-        panic!("ユーザーにより処理が停止されました。");
+/// Ctrl+Cによる割り込みを受けていたらエラーを発生させる。
+fn check_interruption(interruption_handler: &Arc<AtomicBool>) -> Result<(), Errors> {
+    match interruption_handler.load(Ordering::Relaxed) {
+        true => Err(log::make_error!("ユーザーにより処理が停止されました。").as_errors()),
+        false => Ok(()),
     }
 }

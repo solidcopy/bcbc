@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use md5::Digest;
+use path_slash::PathExt;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::filter::Filters;
@@ -19,7 +20,7 @@ impl TargetFile {
         let normalized_path = actual_path
             .strip_prefix(disk_root)
             .unwrap()
-            .to_str()
+            .to_slash()
             .unwrap()
             .nfc()
             .to_string();

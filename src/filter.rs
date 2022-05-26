@@ -1,11 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use regex::Regex;
-use unicode_normalization::UnicodeNormalization;
-
 use crate::log::{self, Errors};
 use crate::run_options::RunOptions;
+use path_slash::PathExt;
+use regex::Regex;
+use unicode_normalization::UnicodeNormalization;
 
 /// フィルター設定
 #[derive(Clone)]
@@ -45,6 +45,7 @@ impl Filters {
     pub fn is_target(&self, filepath: &Path) -> bool {
         // ファイルパスをNFCにする
         let norm_path = filepath.to_str().unwrap().nfc().to_string();
+        let norm_path = Path::new(&norm_path).to_slash().unwrap();
         let norm_path = Path::new(&norm_path);
 
         for filter in self.filters.iter() {

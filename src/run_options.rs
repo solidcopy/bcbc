@@ -13,8 +13,6 @@ pub struct RunOptions {
     config_folder: PathBuf,
     /// ディスクルート一覧
     disk_roots: Vec<PathBuf>,
-    /// 環境変数マップ
-    envs: HashMap<String, String>,
 }
 
 impl RunOptions {
@@ -40,7 +38,6 @@ impl RunOptions {
             output_folder,
             config_folder,
             disk_roots,
-            envs,
         })
     }
 
@@ -62,11 +59,6 @@ impl RunOptions {
     /// ディスクルート一覧を返す。
     pub fn disk_roots(&self) -> &Vec<PathBuf> {
         &self.disk_roots
-    }
-
-    /// 指定された環境変数の値を返す。
-    pub fn required_env(&self, env_name: &str) -> Result<&String, Errors> {
-        require_env(&self.envs, env_name)
     }
 }
 

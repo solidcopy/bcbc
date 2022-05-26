@@ -21,7 +21,7 @@ pub fn main_procedure(
     // 起動設定を構造体に変換する
     let run_options = RunOptions::new(current_folder, args, envs)?;
     // ツール名とバージョンを出力する
-    log::info(format!("bcbc v{}", run_options.required_env("CARGO_PKG_VERSION")?).as_str());
+    log::info(format!("bcbc v{}", env!("CARGO_PKG_VERSION")).as_str());
     // フィルター設定を読み込んで一覧にする
     let filters = filter::load_filters(&run_options)?;
     // ディスク情報を一覧にする

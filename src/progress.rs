@@ -305,7 +305,11 @@ impl DiskProgress {
 
     /// 進捗率を計算する。
     fn rate(&self) -> f64 {
-        (self.red_size as f64) / (self.total_size as f64)
+        if self.total_size > 0 {
+            (self.red_size as f64) / (self.total_size as f64)
+        } else {
+            1.0
+        }
     }
 
     /// 残り時間の秒数を計算する。

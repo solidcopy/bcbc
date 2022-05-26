@@ -15,7 +15,7 @@ use crate::filter::Filters;
 use crate::hash_file;
 use crate::interruption;
 use crate::log::{self, Errors};
-use crate::progress::ProgressUpdate;
+use crate::progress::{ProgressSender, ProgressUpdate};
 use crate::target_file;
 use crate::target_file::TargetFile;
 
@@ -37,11 +37,13 @@ pub fn start_calculation(
         // マップのキーにするためコピーを取っておく
         let disk_id = disk_info.id.clone();
 
+        let progress_sender = ProgressSender::new(disk_info.index, progress_tx.clone());
+
         let worker_handle = start_calculation_thread(
             disk_info,
             output_folder.to_path_buf(),
             filters.clone(),
-            progress_tx.clone(),
+            progress_sender,
         )?;
 
         worker_handles.insert(disk_id, worker_handle);
@@ -55,11 +57,11 @@ fn start_calculation_thread(
     disk_info: DiskInfo,
     output_folder: PathBuf,
     filters: Filters,
-    progress_tx: Sender<ProgressUpdate>,
+    progress_sender: ProgressSender,
 ) -> Result<JoinHandle<Result<(), Errors>>, Errors> {
     match thread::Builder::new()
         .stack_size(STACK_SIZE)
-        .spawn(move || calc_procedure(disk_info, output_folder, filters, progress_tx))
+        .spawn(move || calc_procedure(disk_info, output_folder, filters, progress_sender))
     {
         Ok(handle) => Ok(handle),
         Err(error) => Err(
@@ -70,29 +72,16 @@ fn start_calculation_thread(
     }
 }
 
-/// 進捗更新メッセージを送信する。
-fn send_message(
-    progress_tx: &Sender<ProgressUpdate>,
-    message: ProgressUpdate,
-) -> Result<(), Errors> {
-    match progress_tx.send(message) {
-        Ok(_) => Ok(()),
-        Err(error) => Err(log::make_error!("進捗更新メッセージの送信に失敗しました。")
-            .with(&error)
-            .as_errors()),
-    }
-}
-
 /// ハッシュ計算スレッドのルーチン。
 fn calc_procedure(
     disk_info: DiskInfo,
     output_folder: PathBuf,
     filters: Filters,
-    progress_tx: Sender<ProgressUpdate>,
+    progress_sender: ProgressSender,
 ) -> Result<(), Errors> {
     // ハッシュ計算の初期処理を行う
     let (hash_filepath, target_files) =
-        init_calc_procedure(&disk_info, output_folder, &filters, &progress_tx)?;
+        init_calc_procedure(&disk_info, output_folder, &filters, &progress_sender)?;
 
     // ハッシュファイルを追記モードで開く
     let mut hash_file = hash_file::open_hash_file(hash_filepath.as_path())?;
@@ -105,10 +94,9 @@ fn calc_procedure(
 
     for target_file in target_files.iter() {
         // 新規ファイル計算開始メッセージを送信する
-        send_message(
-            &progress_tx,
-            ProgressUpdate::new_file(target_file.normalized_path().to_path_buf()),
-        )?;
+        progress_sender.send_message(ProgressUpdate::new_file(
+            target_file.normalized_path().to_path_buf(),
+        ))?;
         // 対象ファイルを開く
         let mut file = match open_target_file(target_file.actual_path()) {
             Ok(file) => file,
@@ -118,7 +106,7 @@ fn calc_procedure(
             }
         };
         // ファイルを読み込んでハッシュを計算する
-        let hash = match read_and_calc_hash(&progress_tx, &mut buffer, &mut file) {
+        let hash = match read_and_calc_hash(&progress_sender, &mut buffer, &mut file) {
             Ok(hash) => hash,
             Err(errors) => {
                 per_file_errors.push(errors.into_iter().next().unwrap());
@@ -137,7 +125,7 @@ fn calc_procedure(
         hash_file.flush().unwrap();
 
         // ファイル計算完了メッセージを送信する
-        send_message(&progress_tx, ProgressUpdate::done())?;
+        progress_sender.send_message(ProgressUpdate::done())?;
     }
 
     if per_file_errors.len() == 0 {
@@ -152,10 +140,10 @@ fn init_calc_procedure(
     disk_info: &DiskInfo,
     output_folder: PathBuf,
     filters: &Filters,
-    progress_tx: &Sender<ProgressUpdate>,
+    progress_sender: &ProgressSender,
 ) -> Result<(PathBuf, Vec<TargetFile>), Errors> {
     // 初期化メッセージを送信する
-    send_message(&progress_tx, ProgressUpdate::init(disk_info.id.clone()))?;
+    progress_sender.send_message(ProgressUpdate::init(disk_info.id.clone()))?;
     // ハッシュファイルのパスを取得する
     let hash_filepath = output_folder.join(&disk_info.id);
     // ハッシュファイルの情報をマップにする
@@ -175,10 +163,7 @@ fn init_calc_procedure(
     // メッセージを送信する
     let number_of_files = target_files.len();
     let total_size = target_file::calc_total_size(&target_files);
-    send_message(
-        &progress_tx,
-        ProgressUpdate::list_targets(number_of_files, total_size),
-    )?;
+    progress_sender.send_message(ProgressUpdate::list_targets(number_of_files, total_size))?;
 
     Ok((hash_filepath, target_files))
 }
@@ -195,7 +180,7 @@ fn open_target_file(target_filepath: &Path) -> Result<File, Errors> {
 
 /// ファイルを読み込んでハッシュを計算して返す。
 fn read_and_calc_hash(
-    progress_tx: &Sender<ProgressUpdate>,
+    progress_sender: &ProgressSender,
     mut buffer: &mut [u8],
     target_file: &mut File,
 ) -> Result<Digest, Errors> {
@@ -226,7 +211,7 @@ fn read_and_calc_hash(
             }
         }
 
-        send_message(&progress_tx, ProgressUpdate::read(red_size as u64))?;
+        progress_sender.send_message(ProgressUpdate::read(red_size as u64))?;
     }
 
     Ok(context.compute())

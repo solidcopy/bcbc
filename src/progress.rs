@@ -380,3 +380,29 @@ impl ProgressUpdate {
         }
     }
 }
+
+/// 進捗送信オブジェクト
+pub struct ProgressSender {
+    disk_index: usize,
+    transmitter: Sender<ProgressUpdate>,
+}
+
+impl ProgressSender {
+    pub fn new(disk_index: usize, progress_tx: Sender<ProgressUpdate>) -> ProgressSender {
+        ProgressSender {
+            disk_index,
+            transmitter: progress_tx,
+        }
+    }
+
+    /// 進捗更新メッセージを送信する。
+    pub fn send_message(&self, mut message: ProgressUpdate) -> Result<(), Errors> {
+        message.disk_index = self.disk_index;
+        match self.transmitter.send(message) {
+            Ok(_) => Ok(()),
+            Err(error) => Err(log::make_error!("進捗更新メッセージの送信に失敗しました。")
+                .with(&error)
+                .as_errors()),
+        }
+    }
+}

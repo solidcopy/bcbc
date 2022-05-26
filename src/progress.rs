@@ -127,9 +127,7 @@ impl ProgressSummary {
         }
         line.push(' ');
         // 進捗率
-        if disk_progress.status == DiskProgressStatus::Calculating
-            || disk_progress.status == DiskProgressStatus::WaitNewFile
-        {
+        if disk_progress.status.is_rate_available() {
             write!(line, "{:6.2}", disk_progress.rate() * 100.0).unwrap();
         } else {
             line.push_str("  -.--");
@@ -173,8 +171,8 @@ impl ProgressSummary {
             line.push_str(disk_progress.disk_id.as_ref().unwrap().as_str());
             line.push(' ');
             // 進捗率
-            if disk_progress.status == DiskProgressStatus::Initialized {
-                write!(line, "{:6.2}", disk_progress.rate()).unwrap();
+            if disk_progress.status.is_rate_available() {
+                write!(line, "{:6.2}", disk_progress.rate() * 100.0).unwrap();
             } else {
                 line.push_str("  -.--");
             }
@@ -233,6 +231,11 @@ impl DiskProgressStatus {
             true => Ok(()),
             false => self.status_errors(message_type),
         }
+    }
+
+    /// 進捗率を表示するステータスであるかを返す。
+    fn is_rate_available(&self) -> bool {
+        *self == DiskProgressStatus::Calculating || *self == DiskProgressStatus::WaitNewFile
     }
 
     /// ステータスエラー情報を作成する。

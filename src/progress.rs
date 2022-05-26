@@ -24,7 +24,11 @@ fn progress_monitor_routine(rx: Receiver<ProgressUpdate>) -> Result<(), Errors> 
     let mut prev_output_time = Instant::now();
 
     loop {
-        let progress_update = receive_progress_update(&rx)?;
+        let progress_update = match receive_progress_update(&rx) {
+            Some(progress_update) => progress_update,
+            None => break,
+        };
+
         let is_done = progress_update.message_type == ProgressUpdateType::Done;
         progress_summary.update(progress_update)?;
 
@@ -34,15 +38,15 @@ fn progress_monitor_routine(rx: Receiver<ProgressUpdate>) -> Result<(), Errors> 
             prev_output_time = Instant::now();
         }
     }
+
+    Ok(())
 }
 
 /// 進捗更新メッセージを受信する。
-fn receive_progress_update(rx: &Receiver<ProgressUpdate>) -> Result<ProgressUpdate, Errors> {
+fn receive_progress_update(rx: &Receiver<ProgressUpdate>) -> Option<ProgressUpdate> {
     match rx.recv() {
-        Ok(message) => Ok(message),
-        Err(error) => Err(log::make_error!("進捗更新メッセージの受信に失敗しました。")
-            .with(&error)
-            .as_errors()),
+        Ok(message) => Some(message),
+        Err(_) => None,
     }
 }
 

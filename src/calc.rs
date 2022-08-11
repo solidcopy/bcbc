@@ -21,8 +21,6 @@ use crate::target_file::TargetFile;
 
 /// バッファサイズ
 const BUFFER_SIZE: usize = 10 << 20;
-/// スタックサイズ
-const STACK_SIZE: usize = BUFFER_SIZE + (2 << 20);
 
 /// ディスクごとにハッシュ計算スレッドを開始する。
 pub fn start_calculation(
@@ -39,37 +37,16 @@ pub fn start_calculation(
 
         let progress_sender = ProgressSender::new(disk_info.index, progress_tx.clone());
 
-        let worker_handle = start_calculation_thread(
-            disk_info,
-            output_folder.to_path_buf(),
-            filters.clone(),
-            progress_sender,
-        )?;
+        let output_folder = output_folder.to_path_buf();
+        let filters = filters.clone();
+        let worker_handle = thread::spawn(move || {
+            calc_procedure(disk_info, output_folder, filters, progress_sender)
+        });
 
         worker_handles.insert(disk_id, worker_handle);
     }
 
     Ok(worker_handles)
-}
-
-/// ハッシュ計算スレッドを開始する。
-fn start_calculation_thread(
-    disk_info: DiskInfo,
-    output_folder: PathBuf,
-    filters: Filters,
-    progress_sender: ProgressSender,
-) -> Result<JoinHandle<Result<(), Errors>>, Errors> {
-    match thread::Builder::new()
-        .stack_size(STACK_SIZE)
-        .spawn(move || calc_procedure(disk_info, output_folder, filters, progress_sender))
-    {
-        Ok(handle) => Ok(handle),
-        Err(error) => Err(
-            log::make_error!("ハッシュ計算スレッドを開始できませんでした。")
-                .with(&error)
-                .as_errors(),
-        ),
-    }
 }
 
 /// ハッシュ計算スレッドのルーチン。
@@ -87,7 +64,7 @@ fn calc_procedure(
     let mut hash_file = hash_file::open_hash_file(hash_filepath.as_path())?;
 
     // ファイル読み込み用のバッファ
-    let mut buffer = [0u8; BUFFER_SIZE];
+    let mut buffer = vec![0u8; BUFFER_SIZE];
 
     // ファイルごとに発生したエラーの一覧
     let mut per_file_errors: Errors = vec![];

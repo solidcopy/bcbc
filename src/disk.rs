@@ -162,7 +162,7 @@ fn raise_errors(errors: Vec<Error>) -> Result<(), Errors> {
 
 /// ディスク情報のインデックスを採番する。
 fn index_disk_info(disk_info_list: &mut Vec<DiskInfo>) {
-    for (index, mut disk_info) in disk_info_list.iter_mut().enumerate() {
+    for (index, disk_info) in disk_info_list.iter_mut().enumerate() {
         disk_info.index = index;
     }
 }

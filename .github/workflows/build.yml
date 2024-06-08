@@ -1,0 +1,69 @@
+name: Rust Build
+
+on:
+  push:
+    tags: [ 'v*.*.*' ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary_name: bcbc
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            binary_name: bcbc
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary_name: bcbc.exe
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target ${{ matrix.target }}
+
+      - name: Create Archive
+        uses: vimtor/action-zip@v1.2
+        with:
+          files: target/${{ matrix.target }}/release/${{ matrix.binary_name }}
+          dest: bcbc-${{ matrix.target }}.zip
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bcbc-${{ matrix.target }}
+          path: |
+            bcbc-${{ matrix.target }}.zip
+          compression-level: 0
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      - name: List all artifacts
+        run: ls -R
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./bcbc-x86_64-unknown-linux-gnu/bcbc-x86_64-unknown-linux-gnu.zip
+            ./bcbc-x86_64-apple-darwin/bcbc-x86_64-apple-darwin.zip
+            ./bcbc-x86_64-pc-windows-msvc/bcbc-x86_64-pc-windows-msvc.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
